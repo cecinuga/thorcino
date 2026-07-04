@@ -35,14 +35,15 @@ class Linear(Layer):
         self.weight = Tensor(weight_data)
 
         if bias:
-            self.bias = Tensor(np.zeros(out_feature))
+            bias_data = np.zeros(out_feature)
+            self.bias = Tensor(bias_data)
         else:
             self.bias = None
 
     def __name__(self):
         return "Linear"
 
-    def forward(self, x: Tensor, **_):
+    def forward(self, x: Tensor, **_) -> Tensor:
         """Compute the layer output: y = xW + b"""
         # 1. Matrix multiplication
         output = x.matmul(self.weight)
@@ -56,10 +57,12 @@ class Linear(Layer):
     @property
     def parameters(self):
         """Return the list of trainable parameters in the layer"""
-        params = [self.weight]
-        
-        if self.bias is not None:
-            params.append(self.bias)
+        params = []
+        if self.weight.requires_grad:
+            params.append(self.weight)
+            
+            if self.bias is not None:
+                params.append(self.bias)
 
         return params
     
@@ -68,9 +71,11 @@ class Dropout(Layer):
         super().__init__(p=0.5)
         self.p = p
 
-    def forward(self, x, training=True, **_):
-        if not training: 
+    def forward(self, x: Tensor, training=True, **_) -> Tensor:
+        if not training or self.p == 0: 
             return x
+        if self.p == 1:
+            return Tensor(np.zeros_like(x.data), requires_grad=x.requires_grad)
 
         # 1. Create Mask
         keep_prob = 1.0 - self.p
@@ -90,7 +95,7 @@ class Sequential(Layer):
         super().__init__(layers)
         self.layers = list(layers)
 
-    def forward(self, x, **kwargs):
+    def forward(self, x: Tensor, **kwargs) -> Tensor:
         for i, layer in enumerate(self.layers):
             try:
                 x = layer(x, **kwargs)
