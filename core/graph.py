@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -113,19 +114,38 @@ class ComputationalGraph:
             net.node("net_output", "output", **_STYLE["io"])
             net.edge(prev, "net_output")
 
-    @staticmethod
-    def _layer_label(layer: "Layer") -> str:
-        """Record-shaped label with the layer type and its key attributes."""
-        name = type(layer).__name__
-        parts = [name]
-        for attr in ("in_feature", "out_feature", "p"):
-            if hasattr(layer, attr):
-                parts.append(f"{attr}={getattr(layer, attr)}")
-        has_bias = getattr(layer, "bias", None) is not None
-        if hasattr(layer, "in_feature"):
-            parts.append(f"bias={has_bias}")
+    _REPR_RE = re.compile(r"^(\w+)\((.*)\)$")
+
+    @classmethod
+    def _layer_label(cls, layer: "Layer") -> str:
+        """Record-shaped label built from the layer's own ``__repr__``."""
+        text = repr(layer)
+        match = cls._REPR_RE.match(text)
+        if not match:
+            return "{" + text + "}"
+
+        name, body = match.groups()
+        fields = [name] + cls._split_top_level(body) if body else [name]
         # graphviz record: fields separated by '|'
-        return "{" + " | ".join(parts) + "}"
+        return "{" + " | ".join(fields) + "}"
+
+    @staticmethod
+    def _split_top_level(body: str) -> list[str]:
+        """Split a repr's argument body on top-level commas, ignoring
+        commas nested inside parens/brackets/braces (e.g. a Tensor repr)."""
+        fields: list[str] = []
+        depth = 0
+        start = 0
+        for i, ch in enumerate(body):
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                fields.append(body[start:i].strip())
+                start = i + 1
+        fields.append(body[start:].strip())
+        return fields
 
     # ------------------------------------------------------------------ #
     # Forward computational graph cluster
