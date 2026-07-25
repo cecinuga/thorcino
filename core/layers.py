@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 class Layer(ABC):
     @abstractmethod
     def forward(self, x: Tensor) -> Tensor:
-        """Compute layer output"""
+        """Compute the layer output."""
         raise NotImplementedError
 
     def __call__(self, x: Tensor) -> Tensor:
