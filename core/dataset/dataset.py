@@ -51,8 +51,12 @@ class ImageDataset(Dataset):
         return Tensor(image), Tensor(self.labels[idx])
 
 class DataLoader:
-    def __init__(self, dataset: Dataset, batch_size: int, shuffle: bool = False):
-        self.dataset:Dataset = dataset
+    def __init__(self, dataset: Dataset|list[Tensor], batch_size: int, shuffle: bool = False):
+        if isinstance(dataset, list):
+            self.dataset:Dataset = Dataset(dataset)
+        else:
+            self.dataset:Dataset = dataset
+
         self.batch_size:int = batch_size
         self.shuffle:bool = shuffle
 
@@ -68,7 +72,7 @@ class DataLoader:
         for i in range(0, len(indices), self.batch_size):
             batch_indices = indices[i:i + self.batch_size]
             batch = [self.dataset[idx] for idx in batch_indices]
-            yield self._collate_batch(batch)
+            yield self._collate_batch(batch)        
 
     def _collate_batch(self, batch: list[tuple[Tensor, ...]]) -> tuple[Tensor, ...]:
         num_tensors = len(batch[0]) # e.g., 2 for (features, labels)
