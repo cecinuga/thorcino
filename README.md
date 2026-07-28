@@ -268,7 +268,7 @@ of end-to-end regression scripts and notebooks built on `Trainer` +
 | [`quadratic/`](examples/linear_regression/quadratic/README.md) | Recovers the coefficients of `x² + 2·x + 2` via feature expansion (`[x, x²]`) fed into a `Linear(2, 1)` layer. |
 | [`cubic/`](examples/linear_regression/cubic/cubic.py) | Same idea one degree further: recovers `1.2·x³ − 2.3·x² + 2·x + 2` with a `Linear(3, 1)` layer over `[x, x², x³]`. |
 | [`ill-cond/`](examples/linear_regression/ill-cond/README.md) | Notebook comparing closed-form OLS vs. SGD on ill-conditioned (near-collinear) features, showing OLS's coefficients blow up while SGD's stay stable. |
-| [`variance/`](examples/linear_regression/variance/README.md) | Notebook fitting nine `Linear(1, 1)` models across increasing label noise, showing how the learned slope/intercept drift as noise grows. |
+| [`variance/`](examples/linear_regression/variance/README.md) | Notebook fitting 20 repeated `Linear(1, 1)` models at each of nine label-noise levels, showing via boxplots how the loss and learned slope/intercept drift and spread as noise grows. |
 
 The [`linear_regression/README.md`](examples/linear_regression/README.md)
 ties the linear/quadratic/cubic scripts together and explains why the learning
