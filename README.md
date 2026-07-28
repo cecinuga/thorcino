@@ -14,6 +14,7 @@ the computation graph.
 
 - Python >= 3.14
 - NumPy >= 2.5.0
+- Graphviz >= 0.21
 
 Optional (dev): `ipykernel`, `matplotlib` (used by the examples).
 
