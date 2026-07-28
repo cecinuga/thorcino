@@ -1,10 +1,11 @@
 # Variance in Linear Regression
 
 A **tiny-torch** notebook that studies how the amount of noise in the
-training data affects a linear regression model. Instead of fitting one
-model to one dataset, it fits **nine** models to nine datasets sampled from
-the same underlying line but with progressively more noise, and compares how
-each one trains and what it learns.
+training data affects a linear regression model. For nine increasing noise
+levels, it trains **20 independent models** on freshly re-sampled noisy data
+(180 models in total) and looks at the *spread* of the final loss and the
+learned parameters across those repeats — not just a single run per noise
+level.
 
 The signal to recover is:
 
@@ -55,81 +56,87 @@ scatter.
 
 ---
 
-## Training nine models
+## Training with repeated trials
 
-One `Trainer` is created per noise level, all with an identical
-architecture (`Linear(1, 1)`) and identical hyperparameters — only the data
-they see differs:
+For each noise level, `generate_noise_repeats(size, sample_size, noise)`
+draws `N_REPEATS` independent datasets: the same `x` samples and signal, but
+freshly sampled Gaussian noise added to `y` on every repeat. Every repeat
+gets its own `Trainer` trained from scratch, so the outcome reflects the
+randomness of that one noisy sample rather than being averaged away:
 
 ```python
-EPOCHS = 500
+EPOCHS = 80
 EVAL_STEP = 10
-BATCH_SIZE = 16
+BATCH_SIZE = 1
+N_REPEATS = 20
 MAX_LR, MIN_LR = 1e-2, 1e-4
 
-X_tr, X_te = split_dataset(X, split_ratio=0.9, axis=1)
+for noise in noise_levels:
+    repeats = generate_noise_repeats(N_REPEATS, SAMPLE_SIZE, noise)
+    tr, te = split_dataset(repeats, split_ratio=0.9, axis=1)
 
-for i in range(DATASETS_SIZE):
-    trainer = create_trainer(X.shape[2]-1, X.shape[2]-1, MIN_LR, MAX_LR, EPOCHS)
-    trainers.append(trainer)
-
-fit_models(trainers, X_tr, X_te, EPOCHS, EVAL_STEP, BATCH_SIZE)
+    for sample_tr, sample_te in zip(tr, te):
+        trainer = create_trainer(IN_FEATURE, OUT_FEATURE, MIN_LR, MAX_LR, EPOCHS)
+        loader_tr, loader_te = preprocess_dataloader(sample_tr, sample_te, BATCH_SIZE)
+        fit_model(trainer, loader_tr, loader_te, EPOCHS, EVAL_STEP)
 ```
 
 `create_trainer` wires up a `Sequential(Linear(1, 1))` with `MSELoss`, `SGD`
-and a `CosineSchedule` annealing from `MAX_LR` to `MIN_LR`. `fit_models`
-loops over the `(trainer, dataset)` pairs, wraps each split into a
-`TensorDataset` + `DataLoader` (batch size `16`), and trains every model for
-`EPOCHS` full passes, evaluating every `EVAL_STEP` epochs.
+and a `CosineSchedule` annealing from `MAX_LR` to `MIN_LR`. `BATCH_SIZE` is
+set to `1` to extract the best performance from each model. The final
+parameters and loss history of every repeat, at every noise level, are
+collected into `all_params`, `all_train_loss` and `all_eval_loss`.
 
 ---
 
 ## Loss history
 
-For each of the nine models, the train loss (blue) and eval loss (red) are
-plotted side by side, one subplot per noise level:
+Instead of a single final loss per noise level, there are now `N_REPEATS`
+of them. Taking the last evaluation loss of every repeat
+(`all_eval_loss[:, :, -1]`) and drawing one boxplot per noise level shows
+both the typical loss and its spread across repeats at once:
 
 ```python
-train_loss_history.append([range(EPOCHS), trainer.train_loss])
-eval_loss_history.append([range(0, EPOCHS, EVAL_STEP), trainer.eval_loss])
+final_eval_loss = all_eval_loss[:, :, -1]  # (DATASETS_SIZE, N_REPEATS)
+ax.boxplot(final_eval_loss.T, positions=noise_levels, widths=NOISE_UPTO/DATASETS_SIZE*0.6)
 ```
 
-Laying the nine curves out together makes the effect of noise visible
-directly: models trained on low-noise datasets converge to a small, tight
-loss, while models trained on high-noise datasets settle at a much higher
-loss floor and show a wider gap between train and eval loss.
+At low noise the boxes are small and sit near zero — every repeat converges
+to essentially the same, tiny loss. As the noise level rises, both the
+median loss and the box/whisker spread grow sharply: not only does the
+model fit worse on average, but *which* noisy sample it happened to see
+starts to matter a lot.
 
-![Train and eval loss per noise level](images/losses.png)
+![Final eval loss spread per noise level](images/losses.png)
 
 ---
 
 ## Weights interpretation
 
-Finally, the notebook extracts the learned `weights` and `bias` from every
-trained model:
+Finally, the notebook extracts the learned weight and bias from every one of
+the 180 trained models (`get_model_param`) and draws a boxplot per noise
+level for each parameter, with a dashed red line marking the true value:
 
 ```python
-def get_model_param(model: Sequential) -> np.ndarray:
-    weights, bias = model.parameters
-    return np.array([weights, bias.reshape(-1, 1)])
+weight_samples = all_params[:, :, 0, 0, 0]
+bias_samples   = all_params[:, :, 1, 0, 0]
+
+ax_w.boxplot(weight_samples.T, positions=noise_levels, widths=NOISE_UPTO/DATASETS_SIZE*0.6)
+ax_w.axhline(SLOPE, color='red', linestyle='--', label='True slope')
+
+ax_b.boxplot(bias_samples.T, positions=noise_levels, widths=NOISE_UPTO/DATASETS_SIZE*0.6)
+ax_b.axhline(INTERCEPT, color='red', linestyle='--', label='True intercept')
 ```
 
-and plots them as bar charts, one per noise level, blue bars for the learned
-`[weight, bias]` pair against red bars for the true coefficients
-`[SLOPE, INTERCEPT] = [3.5, 7.1]`:
+At low noise every box hugs the dashed true-value line tightly. As the noise
+level increases, the median estimate drifts away from `SLOPE`/`INTERCEPT`
+*and* the boxes fan out — repeats at the highest noise level occasionally
+recover a slope with the wrong sign entirely. This is the clearest, most
+direct evidence that more variance in the training data makes the fitted
+parameters both less accurate and less reliable, even when the loss on that
+same noisy data looks acceptable.
 
-```python
-models_params = get_models_params([trainer.model for trainer in trainers])
-bar_dataset(models_params, coefs, fig, axs)
-```
-
-At low noise the blue and red bars line up almost exactly. As the noise level
-increases across the nine subplots, the learned weight and bias drift further
-from the true coefficients — the clearest, most direct evidence that more
-variance in the training data makes the fitted parameters less reliable, even
-when the loss on that same noisy data looks acceptable.
-
-![Learned weight and bias vs. true coefficients, one subplot per noise level](images/weights.png)
+![Learned weight and bias spread vs. true coefficients, per noise level](images/weights.png)
 
 ---
 
