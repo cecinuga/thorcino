@@ -45,6 +45,7 @@ class Tensor:
 
     def __add__(self, other: Tensor | np.ndarray | float) -> Tensor:
         if isinstance(other, Tensor):
+            from core.autograd import AddBackward
             out = Tensor(self.data + other.data)
             out._grad_fn = AddBackward(self, other)
             return out
@@ -55,6 +56,7 @@ class Tensor:
 
     def __sub__(self, other: Tensor | np.ndarray | float) -> Tensor:
         if isinstance(other, Tensor):
+            from core.autograd import SubBackward
             out = Tensor(self.data - other.data)
             out._grad_fn = SubBackward(self, other)
             return out
@@ -70,6 +72,7 @@ class Tensor:
 
     def __mul__(self, other: Tensor | np.ndarray | float) -> Tensor:
         if isinstance(other, Tensor):
+            from core.autograd import MulBackward
             out = Tensor(self.data * other.data)
             out._grad_fn = MulBackward(self, other)
             return out
@@ -83,6 +86,7 @@ class Tensor:
 
     def __truediv__(self, other:Tensor | np.ndarray) -> Tensor:
         if isinstance(other, Tensor):
+            from core.autograd import DivBackward
             out = Tensor(self.data / other.data)
             out._grad_fn = DivBackward(self, other)
             return out
@@ -108,6 +112,7 @@ class Tensor:
 
         out = Tensor(np.matmul(self.data, other.data))
         if isinstance(other, Tensor):
+            from core.autograd import MatmulBackward
             out._grad_fn = MatmulBackward(self, other)
             return out
 
@@ -138,6 +143,7 @@ class Tensor:
                 f"[x] Reshape preserves data, so total elements must stay the same\n"+
                 f"[x] Use -1 to infer a dimension: reshape(-1, {new_shape[-1] if len(new_shape) > 0 else 1}) lets NumPy calculate"
             )
+        from core.autograd import ReshapeBackward
         reshaped_data = np.reshape(self.data, new_shape)
         out = Tensor(reshaped_data)
         out._grad_fn = ReshapeBackward(self)
@@ -145,11 +151,13 @@ class Tensor:
         return out
 
     def transpose(self):
+        from core.autograd import TransposeBackward
         out = Tensor(np.transpose(self.data))
         out._grad_fn = TransposeBackward(self)
         return out
 
     def sum(self, axis:int|None=None, keepdims:bool = False) -> Tensor:
+        from core.autograd import SumBackward
         out = Tensor(np.sum(self.data, axis=axis, keepdims=keepdims))
         out._grad_fn = SumBackward(self, axis, keepdims)
         return out
@@ -199,9 +207,3 @@ class Tensor:
                 t.destroy_graph()
             self._grad_fn = None
 
-# Imported at the bottom (after Tensor is defined) to break the circular import
-# between core.tensor and the autograd backward classes, which need Tensor at runtime.
-from core.autograd import (
-    Function, AddBackward, SubBackward, MulBackward, MatmulBackward, SumBackward,
-    ReshapeBackward, TransposeBackward, DivBackward,
-)
