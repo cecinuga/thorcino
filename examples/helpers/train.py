@@ -36,8 +36,8 @@ def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: floa
         Linear(in_feature, out_feature)
     )
     loss = MSELoss()
-    optimizer = SGD(model.parameters, min_lr)
-    scheduler = CosineSchedule(min_lr, min_lr, epochs)
+    optimizer = SGD(model.parameters, max_lr)
+    scheduler = CosineSchedule(max_lr, min_lr, epochs)
     trainer = Trainer(model, loss, optimizer, scheduler)
 
     return trainer
