@@ -42,6 +42,26 @@ def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: floa
 
     return trainer
 
+def get_model_param(model: Sequential) -> np.ndarray:
+    """Return the model parameters"""
+
+    param = model.parameters
+    weights, bias = param
+    bias = bias.reshape(-1, 1)
+
+    param = np.array([weights, bias])
+    return param
+
+def get_models_params(models: list[Sequential]) -> np.ndarray:
+    """Return the models parameters"""
+    
+    params = []
+    for model in models:
+        local_param = get_model_param(model)
+        params.append(local_param)
+
+    return np.array(params)
+
 def fit_model(trainer: Trainer, X_tr: DataLoader, X_te: DataLoader, epochs: int, eval_step: int) -> None:
     """Helper to train a model over a sample"""
 
@@ -57,3 +77,4 @@ def fit_models(trainers: list[Trainer], dataset_tr: np.ndarray, dataset_te: np.n
     for trainer, sample_tr, sample_te in zip(trainers, dataset_tr, dataset_te):        
         sample_tr, sample_te = preprocess_dataloader(sample_tr, sample_te, batch_size)
         fit_model(trainer, sample_tr, sample_te, epochs, eval_step)
+
