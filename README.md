@@ -258,9 +258,20 @@ Data augmentation transforms live in `transformation.py`:
 ## Examples
 
 See [`examples/linear_regression/`](examples/linear_regression/) for a family
-of end-to-end regression scripts (linear, quadratic, cubic degree) built on
-`Trainer` + `DataLoader`, plus a notebook exploring the effect of
-ill-conditioned features on the learned coefficients.
+of end-to-end regression scripts and notebooks built on `Trainer` +
+`DataLoader`:
+
+| Example | Description |
+|---|---|
+| [`linear/`](examples/linear_regression/linear/README.md) | Recovers the slope/intercept of `2·x + 5` with a single `Linear(1, 1)` layer; compares the learned fit against the closed-form `lstsq` solution. |
+| [`quadratic/`](examples/linear_regression/quadratic/README.md) | Recovers the coefficients of `x² + 2·x + 2` via feature expansion (`[x, x²]`) fed into a `Linear(2, 1)` layer. |
+| [`cubic/`](examples/linear_regression/cubic/cubic.py) | Same idea one degree further: recovers `1.2·x³ − 2.3·x² + 2·x + 2` with a `Linear(3, 1)` layer over `[x, x², x³]`. |
+| [`ill-cond/`](examples/linear_regression/ill-cond/README.md) | Notebook comparing closed-form OLS vs. SGD on ill-conditioned (near-collinear) features, showing OLS's coefficients blow up while SGD's stay stable. |
+| [`variance/`](examples/linear_regression/variance/README.md) | Notebook fitting nine `Linear(1, 1)` models across increasing label noise, showing how the learned slope/intercept drift as noise grows. |
+
+The [`linear_regression/README.md`](examples/linear_regression/README.md)
+ties the linear/quadratic/cubic scripts together and explains why the learning
+rate has to shrink as the polynomial degree grows.
 
 ```bash
 uv run python examples/linear_regression/linear/linear.py
