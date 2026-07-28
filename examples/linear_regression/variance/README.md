@@ -46,6 +46,13 @@ X_clean = generate_dataset(size=DATASETS_SIZE, sample_size=SAMPLE_SIZE, noise_up
 Both datasets share the same `SEED`, so the noisy samples and the clean line
 line up on the same `x` values, one subplot per noise level.
 
+![Noisy samples vs. clean signal, one subplot per noise level](images/datasets.png)
+
+The first subplot is essentially noise-free — the blue points sit right on
+the red line — and each subsequent subplot fans the points out further from
+it, up to the last one where the line is barely recognizable inside the
+scatter.
+
 ---
 
 ## Training nine models
@@ -92,6 +99,8 @@ directly: models trained on low-noise datasets converge to a small, tight
 loss, while models trained on high-noise datasets settle at a much higher
 loss floor and show a wider gap between train and eval loss.
 
+![Train and eval loss per noise level](images/losses.png)
+
 ---
 
 ## Weights interpretation
@@ -119,6 +128,8 @@ increases across the nine subplots, the learned weight and bias drift further
 from the true coefficients — the clearest, most direct evidence that more
 variance in the training data makes the fitted parameters less reliable, even
 when the loss on that same noisy data looks acceptable.
+
+![Learned weight and bias vs. true coefficients, one subplot per noise level](images/weights.png)
 
 ---
 
