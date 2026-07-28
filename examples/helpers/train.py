@@ -51,9 +51,9 @@ def fit_model(trainer: Trainer, X_tr: DataLoader, X_te: DataLoader, epochs: int,
         if i % eval_step == 0:
             _ = trainer.eval(X_te)
 
-def fit_models(trainers: list[Trainer], dataset_tr: np.ndarray, dataset_te: np.ndarray, batch_size: int = 1) -> None:
+def fit_models(trainers: list[Trainer], dataset_tr: np.ndarray, dataset_te: np.ndarray, epochs: int, eval_step: int, batch_size: int = 1) -> None:
     """Helper to train a set of models over the complete dataset"""
 
     for trainer, sample_tr, sample_te in zip(trainers, dataset_tr, dataset_te):        
         sample_tr, sample_te = preprocess_dataloader(sample_tr, sample_te, batch_size)
-        fit_model(trainer, sample_tr, sample_te)
+        fit_model(trainer, sample_tr, sample_te, epochs, eval_step)
