@@ -9,7 +9,7 @@ class MSELossBackward(Function):
     def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
         predictions, targets = self.saved_tensors
         err = (predictions.data - targets.data)
-        local_grad = (2*err)/len(predictions.data)
+        local_grad = (2*err)/predictions.data.size
 
         return Tensor(grad_output.data * local_grad),
 
