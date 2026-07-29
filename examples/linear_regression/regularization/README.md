@@ -35,6 +35,8 @@ X = generate_dataset(f, size=DATASETS_SIZE, sample_size=SAMPLE_SIZE, noise_upto=
 X_clean = generate_dataset(f, size=DATASETS_SIZE, sample_size=SAMPLE_SIZE, noise_upto=0, min=MIN, max=MAX, seed=SEED)
 ```
 
+![Noisy samples vs. clean signal, one panel per noise level](images/dataset_overview.png)
+
 ---
 
 ## STEP 1 — Variance without regularization
@@ -70,6 +72,8 @@ learned weight/bias (`all_params[:, :, 0, 0, 0]` / `all_params[:, :, 1, 0, 0]`),
 a boxplot per noise level shows both the typical value and its spread across
 repeats, with a dashed red line marking the true `SLOPE`/`INTERCEPT`.
 
+![Final loss, weight, and bias spread across repeats, per noise level, without regularization](images/step1_no_regularization.png)
+
 **Consideration:** the weight, bias and final evaluation loss spread all
 increase with the noise level — expected, since higher noise makes it harder
 for the model to recover the underlying signal.
@@ -99,6 +103,8 @@ for decay in decay_levels:
 `create_trainer`'s `weights_decay` argument is forwarded straight into
 `SGD(model.parameters, max_lr, weights_decay)`, which applies L2 weight decay
 during the optimizer step.
+
+![Final loss, weight, and bias spread across repeats, per weight decay level, noise fixed](images/step2_weight_decay.png)
 
 **Consideration:** with noise held fixed at Step 1's highest level,
 increasing `weight_decay` visibly tightens both the weight and bias spread
