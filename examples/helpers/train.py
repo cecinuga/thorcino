@@ -29,14 +29,14 @@ def split_dataset(X:np.ndarray, split_ratio:float = 0.9, axis:int=0) -> tuple[np
 
     return X0, X1
 
-def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: float, epochs: int) -> Trainer:
+def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: float, epochs: int, weights_decay:float = 0) -> Trainer:
     """Helper to build model, loss, optimizer, scheduler and finally return the trainer"""
 
     model = Sequential(
         Linear(in_feature, out_feature)
     )
     loss = MSELoss()
-    optimizer = SGD(model.parameters, max_lr)
+    optimizer = SGD(model.parameters, max_lr, weights_decay)
     scheduler = CosineSchedule(max_lr, min_lr, epochs)
     trainer = Trainer(model, loss, optimizer, scheduler)
 

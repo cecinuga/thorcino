@@ -58,7 +58,7 @@ scatter.
 
 ## Training with repeated trials
 
-For each noise level, `generate_noise_repeats(size, sample_size, noise)`
+For each noise level, `generate_noise_dataset(size, sample_size, noise)`
 draws `N_REPEATS` independent datasets: the same `x` samples and signal, but
 freshly sampled Gaussian noise added to `y` on every repeat. Every repeat
 gets its own `Trainer` trained from scratch, so the outcome reflects the
@@ -72,7 +72,7 @@ N_REPEATS = 20
 MAX_LR, MIN_LR = 1e-2, 1e-4
 
 for noise in noise_levels:
-    repeats = generate_noise_repeats(N_REPEATS, SAMPLE_SIZE, noise)
+    repeats = generate_noise_dataset(N_REPEATS, SAMPLE_SIZE, noise)
     tr, te = split_dataset(repeats, split_ratio=0.9, axis=1)
 
     for sample_tr, sample_te in zip(tr, te):

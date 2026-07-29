@@ -1,5 +1,6 @@
 """Plot data helper"""
 
+from matplotlib.axes import Axes
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
@@ -40,3 +41,18 @@ def plot_dataset(X:np.ndarray, fig: Figure, axs: np.ndarray, color:str='red', ax
 
     for i, ax in enumerate(axs):
         ax.plot(X[i, :, 0], X[i, :, 1], color=color)
+
+def plot_multi_sample(X:np.ndarray, fig: Figure, ax: Axes, colors:list[str], axis=1) -> None:
+    assert X.shape[0] == len(colors)
+
+    for i, (x, c) in enumerate(zip(X, colors)):
+        ax.plot(x[i, :, 0], x[i, :, 1], c)
+
+def plot_multi_dataset(X:np.ndarray, fig: Figure, axs: np.ndarray, colors:list[str], axis=1) -> None:
+    assert X.shape[0] == len(colors)
+
+    X = X.swapaxes(axis, 1)
+
+    for i, (x, ax) in enumerate(zip(X, axs)):
+        plot_multi_dataset(x, fig, ax, colors)
+     
