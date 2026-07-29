@@ -100,4 +100,6 @@ coefficients, not the data points.
 python examples/linear_regression/linear/linear.py
 python examples/linear_regression/quadratic/quadratic.py
 python examples/linear_regression/cubic/cubic.py
+jupyter notebook examples/linear_regression/ill-cond/main.ipynb
+jupyter notebook examples/linear_regression/variance/main.ipynb
 ```
