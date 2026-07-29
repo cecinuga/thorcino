@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import override, TYPE_CHECKING
 import numpy as np
+from core.consts import BIAS_ROLE, WEIGHTS_ROLE
 from core.tensor import Tensor
 
 if TYPE_CHECKING:
@@ -42,10 +43,10 @@ class Linear(Layer):
         # Xavier initialization
         scale = np.sqrt(1.0 / in_feature)
         weights_data:np.ndarray = np.random.randn(in_feature, out_feature) * scale
-        self.weights:Tensor = Tensor(weights_data, role="weights")
+        self.weights:Tensor = Tensor(weights_data, role=WEIGHTS_ROLE)
 
         if bias:
-            self.bias = Tensor(np.zeros(out_feature), role="bias")
+            self.bias = Tensor(np.zeros(out_feature), role=BIAS_ROLE)
         else:
             self.bias = None
 

@@ -1,5 +1,6 @@
 from typing import override, Any
 import numpy as np
+from core.consts import BIAS_ROLE, WEIGHTS_ROLE
 from core.tensor import Tensor
 
 class Optimizer:
@@ -19,9 +20,10 @@ class Optimizer:
         raise NotImplementedError()
 
 class SGD(Optimizer):
-    def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float=0.0):
+    def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0, bias_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
+        self.bias_decay:float = bias_decay
         self.weight_decay:float = weight_decay
 
     @override
@@ -31,8 +33,12 @@ class SGD(Optimizer):
             if param.grad is None: continue
 
             grad_data = param.grad
-            if self.weight_decay != 0:
+            
+            if self.weight_decay != 0 and param.role == WEIGHTS_ROLE:
                 grad_data = grad_data + self.weight_decay * param.data
+
+            if self.bias_decay != 0 and param.role == BIAS_ROLE:
+                grad_data = grad_data + self.bias_decay * param.data
 
             param.data -= self.lr * grad_data
 
@@ -41,7 +47,7 @@ class SGD(Optimizer):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
 
 class SGDM(Optimizer):
-    def __init__(self, params: list[Tensor], lr: float=0.01, momentum: float=0.0, weight_decay:float=0.0):
+    def __init__(self, params: list[Tensor], lr:float = 0.01, momentum:float = 0.0, weight_decay:float = 0.0):
         super().__init__(params, lr)
         self.momentum_buffer:list[np.ndarray|None] = [None for _ in params]
         self.weight_decay:float = weight_decay
