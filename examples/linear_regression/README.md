@@ -17,13 +17,14 @@ wrap it in a `TensorDataset` + `DataLoader`, and train a `Trainer` (`MSELoss`
 evaluate on the wider `[-10, 10]` to check that the model *extrapolates*
 instead of memorizing.
 
-Two further notebooks reuse the same primitives to study a specific failure
+Three further notebooks reuse the same primitives to study a specific failure
 mode instead of increasing polynomial degree:
 
 | Example | Studies | Model | Details |
 |---|---|---|---|
 | [`ill-cond/`](./ill-cond) | OLS vs. SGD under near-multicollinear features | `Linear(2, 2)` | [README](./ill-cond/README.md) |
 | [`variance/`](./variance) | How noisy targets affect learned parameters, across repeated fits | `Linear(1, 1)` | [README](./variance/README.md) |
+| [`regularization/`](./regularization) | How weight decay (L2) reduces that parameter variance, at fixed noise | `Linear(1, 1)` | [README](./regularization/README.md) |
 
 ---
 
@@ -102,4 +103,5 @@ python examples/linear_regression/quadratic/quadratic.py
 python examples/linear_regression/cubic/cubic.py
 jupyter notebook examples/linear_regression/ill-cond/main.ipynb
 jupyter notebook examples/linear_regression/variance/main.ipynb
+jupyter notebook examples/linear_regression/regularization/main.ipynb
 ```
