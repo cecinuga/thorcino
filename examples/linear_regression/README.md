@@ -17,6 +17,14 @@ wrap it in a `TensorDataset` + `DataLoader`, and train a `Trainer` (`MSELoss`
 evaluate on the wider `[-10, 10]` to check that the model *extrapolates*
 instead of memorizing.
 
+Two further notebooks reuse the same primitives to study a specific failure
+mode instead of increasing polynomial degree:
+
+| Example | Studies | Model | Details |
+|---|---|---|---|
+| [`ill-cond/`](./ill-cond) | OLS vs. SGD under near-multicollinear features | `Linear(2, 2)` | [README](./ill-cond/README.md) |
+| [`variance/`](./variance) | How noisy targets affect learned parameters, across repeated fits | `Linear(1, 1)` | [README](./variance/README.md) |
+
 ---
 
 ## Differences between polynomials
