@@ -20,6 +20,28 @@ class Optimizer:
         raise NotImplementedError()
 
 class SGD(Optimizer):
+    def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0):
+        super().__init__(params, lr)
+        self.lr:float = lr
+        self.weight_decay:float = weight_decay
+
+    @override
+    def step(self) -> None:
+        self.step_count += 1
+        for param in self.params:
+            if param.grad is None: continue
+
+            grad_data = param.grad
+            if self.weight_decay != 0 and param.role == WEIGHTS_ROLE:
+                grad_data = grad_data + self.weight_decay * param.data
+
+            param.data -= self.lr * grad_data
+
+    @override
+    def get_state(self):
+        return { 'lr': self.lr, 'weight_decay': self.weight_decay }
+    
+class SGD_DL2(Optimizer):
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0, bias_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -33,11 +55,11 @@ class SGD(Optimizer):
             if param.grad is None: continue
 
             grad_data = param.grad
-            
-            if self.weight_decay != 0 and param.role == WEIGHTS_ROLE:
-                grad_data = grad_data + self.weight_decay * param.data
 
-            if self.bias_decay != 0 and param.role == BIAS_ROLE:
+            if param.role == WEIGHTS_ROLE and self.weight_decay != 0:
+                grad_data = grad_data + self.weight_decay * param.data
+                
+            if param.role == BIAS_ROLE and self.bias_decay != 0:
                 grad_data = grad_data + self.bias_decay * param.data
 
             param.data -= self.lr * grad_data
