@@ -80,48 +80,42 @@ for the model to recover the underlying signal.
 
 ---
 
-## STEP 2 — Reducing variance with weight and bias decay
+## STEP 2 — Reducing variance with weight decay
 
 Same training loop as Step 1, but with the noise level **fixed** at Step 1's
-noisiest setting (`FIXED_NOISE = NOISE_UPTO`), and two *independent* decay
-terms swept together instead: `weights_decay`, from `0` to
-`WEIGHTS_DECAY_UPTO = 20`, and `bias_decay`, from `0` to `BIAS_DECAY_UPTO = 5`:
+noisiest setting (`FIXED_NOISE = NOISE_UPTO`), and `weights_decay` swept
+instead, from `0` to `WEIGHTS_DECAY_UPTO = 20`:
 
 ```python
-BIAS_DECAY_UPTO = 5
 WEIGHTS_DECAY_UPTO = 20
-FIXED_NOISE = NOISE_UPTO  # keep noise fixed so the sweep isolates the decay effect
+FIXED_NOISE = NOISE_UPTO  # keep noise fixed so the sweep isolates the weight_decay effect
 
-for w_decay, b_decay in zip(weights_decay_levels, bias_decay_levels):
+for w_decay in weights_decay_levels:
     repeats = generate_noise_dataset(f, N_REPEATS, SAMPLE_SIZE, FIXED_NOISE, MIN, MAX, SEED)
     tr, te = split_dataset(repeats, split_ratio=0.9, axis=1)
 
     for sample_tr, sample_te in zip(tr, te):
         loader_tr, loader_te = preprocess_dataloader(sample_tr, sample_te, BATCH_SIZE)
-        trainer = create_trainer(IN_FEATURE, OUT_FEATURE, MIN_LR, MAX_LR, EPOCHS, w_decay, b_decay)
+        trainer = create_trainer(IN_FEATURE, OUT_FEATURE, MIN_LR, MAX_LR, EPOCHS, w_decay)
         fit_model(trainer, loader_tr, loader_te, EPOCHS, EVAL_STEP)
 ```
 
-`create_trainer`'s `weights_decay` and `bias_decay` arguments are forwarded
-straight into `SGD(model.parameters, max_lr, weights_decay, bias_decay)`,
-which applies L2 decay during the optimizer step — `weights_decay` only to
-the `WEIGHTS_ROLE` parameter (the slope), `bias_decay` only to the
-`BIAS_ROLE` parameter (the intercept). Because the two terms act on
-different parameters, each can be swept on its own scale.
+`create_trainer`'s `weights_decay` argument is forwarded straight into
+`SGD(model.parameters, max_lr, weights_decay)`, which applies L2 decay
+during the optimizer step only to the `WEIGHTS_ROLE` parameter (the slope).
+The bias (`BIAS_ROLE` parameter, the intercept) is left undecayed.
 
 ![Final loss, weight, and bias spread across repeats, per decay level, noise fixed](images/step2_weight_decay.png)
 
 **Consideration:** with noise held fixed at Step 1's highest level,
-increasing the decay terms visibly tightens both the weight and bias spread
-and lowers the final evaluation loss — the variance-reduction effect
-regularization is meant to demonstrate.
+increasing `weights_decay` visibly tightens the weight spread and lowers
+the final evaluation loss — the variance-reduction effect regularization
+is meant to demonstrate.
 
-The trade-off is also visible: as the decay terms grow, the weight and bias
-means drift away from the true `SLOPE`/`INTERCEPT` toward `0` — the classic
-bias-variance tradeoff. Since `weights_decay` and `bias_decay` are two
-independent regularization terms — the former penalizing only the slope,
-the latter only the intercept — each can be tuned separately, and their
-sweep ranges (`WEIGHTS_DECAY_UPTO` vs. `BIAS_DECAY_UPTO`) don't need to match.
+The trade-off is also visible: as `weights_decay` grows, the weight mean
+drifts away from the true `SLOPE` toward `0` — the classic bias-variance
+tradeoff. The bias is left undecayed, so its spread stays governed by the
+fixed noise level rather than by the sweep.
 
 ---
 
