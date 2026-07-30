@@ -6,7 +6,6 @@ from core.tensor import Tensor
 
 def preprocess_dataloader(sample_tr: np.ndarray, sample_te: np.ndarray, batch_size:int = 1) -> tuple[DataLoader, DataLoader]:
     """Helper to create a DataLoader starting to Numpy arrays"""
-
     sample_tr_x, sample_tr_y = sample_tr[:, :-1], sample_tr[:, -1].reshape(-1, 1)
     sample_te_x, sample_te_y = sample_te[:, :-1], sample_te[:, -1].reshape(-1, 1)
 
@@ -20,8 +19,14 @@ def split_dataset(X:np.ndarray, split_ratio:float = 0.9, axis:int=0) -> tuple[np
 
     assert axis < len(X.shape)
     split_idx = int(X.shape[axis]*split_ratio)
+
+    slicer0 = [slice(None)] * len(X.shape)
+    slicer1 = [slice(None)] * len(X.shape)
     
-    X0, X1 = X[:, :split_idx], X[:, split_idx:]
+    slicer0[axis] = slice(None, split_idx)
+    slicer1[axis] = slice(split_idx, None)
+
+    X0, X1 = X[tuple(slicer0)], X[tuple(slicer1)]
 
     return X0, X1
 
