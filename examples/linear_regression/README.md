@@ -103,5 +103,6 @@ python examples/linear_regression/quadratic/quadratic.py
 python examples/linear_regression/cubic/cubic.py
 jupyter notebook examples/linear_regression/ill-cond/main.ipynb
 jupyter notebook examples/linear_regression/variance/main.ipynb
-jupyter notebook examples/linear_regression/regularization/main.ipynb
+jupyter notebook examples/linear_regression/regularization/L2/main.ipynb
+jupyter notebook examples/linear_regression/regularization/DL2/main.ipynb
 ```
