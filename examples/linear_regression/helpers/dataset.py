@@ -1,5 +1,6 @@
 from typing import Any
 import numpy as np
+from sklearn.datasets import make_regression
 
 from core.dataset.dataset import DataLoader, TensorDataset
 from core.tensor import Tensor
@@ -58,3 +59,15 @@ def generate_dataset(f: Any, size: int, sample_size: int, noise_upto: float, min
         datasets.append(sample)
 
     return np.stack(datasets)
+
+def make_splitted_regression(bias: float, noise: float, batch_size: int, seed: float = 777) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    X, y, true_coefs = make_regression(n_samples=100, n_features=1, n_targets=1, bias=bias, noise=noise, coef=True, random_state=seed)
+
+    true_coefs = np.array([true_coefs])
+
+    X, y = X, y.reshape(-1, 1)
+
+    X_tr, X_te = split_dataset(X, axis=0)
+    y_tr, y_te = split_dataset(y, axis=0)
+
+    return true_coefs, X_tr, X_te, y_tr, y_te
