@@ -28,7 +28,7 @@ def get_model_param(model: Sequential) -> np.ndarray:
     weights, bias = param
     bias = bias.reshape(-1, 1)
 
-    param = np.array([weights, bias])
+    param = np.array([weights, bias], dtype=object)
     return param
 
 def get_models_params(models: list[Sequential]) -> np.ndarray:
