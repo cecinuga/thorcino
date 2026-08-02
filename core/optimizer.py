@@ -32,7 +32,7 @@ class SGD(Optimizer):
             if param.grad is None: continue
 
             grad_data = param.grad
-            if self.weight_decay != 0 and param.role == WEIGHTS_ROLE:
+            if param.role == WEIGHTS_ROLE and self.weight_decay != 0:
                 grad_data = grad_data + self.weight_decay * param.data
 
             param.data -= self.lr * grad_data
