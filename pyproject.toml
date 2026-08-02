@@ -1,15 +1,32 @@
 [project]
-name = "tiny-torch"
-version = "0.1.1"
-description = "Add your description here"
+name = "thorcino"
+version = "0.1.2"
+description = "A minimal, educational deep-learning framework built from scratch on top of NumPy"
 readme = "README.md"
 requires-python = ">=3.14"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [
+    { name = "cecinuga", email = "cecinuga.tdb@gmail.com" },
+]
+keywords = ["deep-learning", "autograd", "neural-network", "numpy", "education"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.14",
+]
 dependencies = [
     "numpy>=2.5.0",
     "graphviz>=0.21",
     "scikit-learn>=1.9.0",
     "pandas>=3.0.3",
 ]
+
+[project.urls]
+Repository = "https://github.com/cecinuga/tiny-torch"
 
 [build-system]
 requires = ["hatchling"]
@@ -20,9 +37,11 @@ packages = ["core"]
 
 [dependency-groups]
 dev = [
+    "flake8>=7.3.0",
     "ipykernel>=6.29.0",
     "matplotlib>=3.11.0",
     "myst_nb>=0.19.0",
+    "pytest>=9.1.1",
 ]
 
 [tool.basedpyright]
