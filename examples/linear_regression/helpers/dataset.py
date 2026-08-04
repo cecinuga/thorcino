@@ -1,6 +1,7 @@
+import random
 from typing import Any
 import numpy as np
-from sklearn.datasets import make_regression
+from sklearn.datasets import make_regression, make_low_rank_matrix
 
 from core.dataset.dataset import DataLoader, TensorDataset
 from core.tensor import Tensor
@@ -44,9 +45,38 @@ def generate_noise_dataset(f: Any, size: int, sample_size: int, noise: float, mi
 
     return np.stack(repeats)
 
+def generate_illcond_regression_repeats(size: int, n_samples:int, n_feature:int, n_targets:int, effective_rank:int, tail_strength:float, noise:float, seed: int) -> tuple[np.ndarray, np.ndarray]:
+    """`size` independent ill-conditioned realizations, each drawn from its own random_state so both the design matrix and the underlying true coefficients differ per trial. Returns the stacked samples alongside the per-trial true coefficients used to generate them."""
+    repeats = []
+    coefs = []
+    for i in range(size):
+        X, y, coef = make_regression(
+            n_samples=n_samples,
+            n_features=n_feature,
+            n_targets=n_targets,
+            noise=noise,
+            tail_strength=tail_strength,
+            effective_rank=effective_rank,
+            coef=True,
+            random_state=seed+i
+        )
+        repeats.append(np.hstack([X, y.reshape(n_samples, n_targets)]))
+        coefs.append(coef.reshape(n_feature, n_targets))
+
+    return np.stack(repeats), np.stack(coefs)
+
 def generate_regression_repeats(size: int, sample_size: int, n_features: int, n_targets: int, noise: float, bias: float, seed: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """`size` independent noisy realizations of the same sklearn make_regression signal: X and the true coefficients are fixed (generated once with noise=0), only the y-noise draw differs per repeat."""
-    X, y_clean, coef = make_regression(n_samples=sample_size, n_features=n_features, n_targets=n_targets, n_informative=n_features, bias=bias, noise=0.0, coef=True, random_state=seed)
+    X, y_clean, coef = make_regression(
+        n_samples=sample_size, 
+        n_features=n_features, 
+        n_targets=n_targets, 
+        n_informative=n_features, 
+        bias=bias, 
+        noise=0.0, 
+        coef=True, 
+        random_state=seed
+    )
     y_clean = y_clean.reshape(sample_size, n_targets)
     coef = coef.reshape(n_features, n_targets)
 
@@ -57,6 +87,21 @@ def generate_regression_repeats(size: int, sample_size: int, n_features: int, n_
     ])
 
     return X, y_clean, repeats, coef
+
+def generate_low_rank_repeats(size: int, sample_size: int, n_features: int, effective_rank: int, tail_strength: float, seed: float) -> np.ndarray:
+    """`size` independent low-rank matrices (columns hold both features and target(s)), each drawn from its own random_state so trials differ, but share the same shape/rank structure."""
+    repeats = np.stack([
+        make_low_rank_matrix(
+            n_samples=sample_size,
+            n_features=n_features,
+            random_state=seed + i,
+            effective_rank=effective_rank,
+            tail_strength=tail_strength,
+        )
+        for i in range(size)
+    ])
+
+    return repeats
 
 def generate_dataset(f: Any, size: int, sample_size: int, noise_upto: float, min: float, max: float, seed: float) -> np.ndarray:
     rng = np.random.default_rng(seed)
