@@ -1,7 +1,7 @@
 import numpy as np
-from core.tensor import Tensor
-from core.functions import softmax
-from core.autograd.base import Function
+from thorcino.tensor import Tensor
+from thorcino.functions import softmax
+from thorcino.autograd.base import Function
 from typing import override
 
 class MSELossBackward(Function):

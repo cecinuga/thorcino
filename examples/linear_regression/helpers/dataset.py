@@ -3,8 +3,8 @@ from typing import Any
 import numpy as np
 from sklearn.datasets import make_regression, make_low_rank_matrix
 
-from core.dataset.dataset import DataLoader, TensorDataset
-from core.tensor import Tensor
+from thorcino.dataset.dataset import DataLoader, TensorDataset
+from thorcino.tensor import Tensor
 
 def preprocess_dataloader(sample_tr: np.ndarray, sample_te: np.ndarray, batch_size:int = 1, n_targets:int = 1) -> tuple[DataLoader, DataLoader]:
     """Helper to create a DataLoader starting to Numpy arrays"""

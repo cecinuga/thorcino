@@ -1,8 +1,8 @@
 from typing import override
-from core.layers import Layer
-from core.tensor import Tensor
-from core.functions import relu, sigmoid, tanh, gelu, softmax
-from core.autograd import ReLUBackward, SigmoidBackward, TanhBackward, GELUBackward, SoftmaxBackward
+from thorcino.layers import Layer
+from thorcino.tensor import Tensor
+from thorcino.functions import relu, sigmoid, tanh, gelu, softmax
+from thorcino.autograd import ReLUBackward, SigmoidBackward, TanhBackward, GELUBackward, SoftmaxBackward
 
 class ReLU(Layer):
     @override

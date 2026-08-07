@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import override, TYPE_CHECKING
 import numpy as np
-from core.consts import BIAS_ROLE, WEIGHTS_ROLE
-from core.tensor import Tensor
+from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
+from thorcino.tensor import Tensor
 
 if TYPE_CHECKING:
-    from core.graph import ComputationalGraph
+    from thorcino.graph import ComputationalGraph
 
 class Layer(ABC):
     @abstractmethod
@@ -169,7 +169,7 @@ class Sequential(Layer):
             backward: include the backward computational graph (autograd ops).
         """
         # Imported lazily to avoid a circular import (core.graph imports layers).
-        from core.graph import ComputationalGraph
+        from thorcino.graph import ComputationalGraph
         self._graph = ComputationalGraph(self)
         self._graph.build(arch=arch, forward=forward, backward=backward)
 

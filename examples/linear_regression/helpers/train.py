@@ -1,10 +1,10 @@
 import numpy as np
-from core.dataset.dataset import DataLoader
-from core.layers import Linear, Sequential
-from core.losses import MSELoss
-from core.optimizer import SGD
-from core.training.schedulers import CosineSchedule
-from core.training.trainer import Trainer
+from thorcino.dataset.dataset import DataLoader
+from thorcino.layers import Linear, Sequential
+from thorcino.losses import MSELoss
+from thorcino.optimizer import SGD
+from thorcino.training.schedulers import CosineSchedule
+from thorcino.training.trainer import Trainer
 from examples.linear_regression.helpers.dataset import preprocess_dataloader
 
 

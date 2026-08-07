@@ -1,8 +1,8 @@
 import numpy as np
 from typing import override
-from core.tensor import Tensor
-from core.utils import unbroadcast
-from core.autograd.base import Function
+from thorcino.tensor import Tensor
+from thorcino.utils import unbroadcast
+from thorcino.autograd.base import Function
 
 class AddBackward(Function):
     @override

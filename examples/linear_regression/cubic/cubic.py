@@ -1,9 +1,9 @@
-from core.dataset import DataLoader, TensorDataset
-from core.optimizer import SGD
-from core.tensor import Tensor
-from core.losses import MSELoss
-from core.training import Trainer, CosineSchedule
-from core.layers import Sequential, Linear
+from thorcino.dataset import DataLoader, TensorDataset
+from thorcino.optimizer import SGD
+from thorcino.tensor import Tensor
+from thorcino.losses import MSELoss
+from thorcino.training import Trainer, CosineSchedule
+from thorcino.layers import Sequential, Linear
 import numpy as np
 import matplotlib.pyplot as plt
 

@@ -6,11 +6,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 import graphviz
 
-from core.tensor import Tensor
+from thorcino.tensor import Tensor
 
 if TYPE_CHECKING:
-    from core.layers import Layer
-    from core.autograd import Function
+    from thorcino.layers import Layer
+    from thorcino.autograd import Function
 
 
 # Visual palette shared by every node kind so the two sub-graphs read as one picture.

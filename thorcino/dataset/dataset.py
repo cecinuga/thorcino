@@ -2,8 +2,8 @@ from pathlib import Path
 import random
 import numpy as np
 from typing import override
-from core.dataset.utils import load_jpeg
-from core.tensor import Tensor
+from thorcino.dataset.utils import load_jpeg
+from thorcino.tensor import Tensor
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 

@@ -1,9 +1,9 @@
 from typing import override
 from abc import ABC, abstractmethod
 
-from core.autograd import CrossEntropyLossBackward, MSELossBackward, BCELossBackward, Function
-from core.functions import mse, cross_entropy, binary_cross_entropy
-from core.tensor import Tensor
+from thorcino.autograd import CrossEntropyLossBackward, MSELossBackward, BCELossBackward, Function
+from thorcino.functions import mse, cross_entropy, binary_cross_entropy
+from thorcino.tensor import Tensor
 
 class Loss(ABC):
     grad_fn: type[Function] = Function

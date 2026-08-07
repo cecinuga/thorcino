@@ -2,12 +2,12 @@ import pickle
 import numpy as np
 from pathlib import Path
 
-from core.losses import Loss
-from core.layers import Layer
-from core.tensor import Tensor
-from core.training.schedulers import Schedule
-from core.dataset import DataLoader
-from core.optimizer import Optimizer
+from thorcino.losses import Loss
+from thorcino.layers import Layer
+from thorcino.tensor import Tensor
+from thorcino.training.schedulers import Schedule
+from thorcino.dataset import DataLoader
+from thorcino.optimizer import Optimizer
 
 def clip_grad_norm(parameters: list[Tensor], max_norm: float = 1.0) -> float:
     """Scale all parameter gradients in-place so their combined L2 norm doesn't exceed max_norm; returns the pre-clip norm."""

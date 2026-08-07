@@ -1,7 +1,7 @@
 from typing import override, Any
 import numpy as np
-from core.consts import BIAS_ROLE, WEIGHTS_ROLE
-from core.tensor import Tensor
+from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
+from thorcino.tensor import Tensor
 
 class Optimizer:
     def __init__(self, params: list[Tensor], lr: float):

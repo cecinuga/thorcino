@@ -1,8 +1,8 @@
 import numpy as np
-from core.functions import sigmoid, tanh, softmax
-from core.tensor import Tensor
+from thorcino.functions import sigmoid, tanh, softmax
+from thorcino.tensor import Tensor
 from typing import override
-from core.autograd.base import Function
+from thorcino.autograd.base import Function
 
 class ReLUBackward(Function):
     @override
