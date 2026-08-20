@@ -91,10 +91,10 @@ class SGDM(Optimizer):
                     self.momentum_buffer[i] = np.zeros_like(param.data)
 
                 # Update velocity: v = momentum * v_prev + grad
-                self.momentum_buffer[i] = (self.momentum * self.momentum_buffer[i]) + grad_data  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
+                self.momentum_buffer[i] = (self.momentum * self.momentum_buffer[i]) + grad_data    
                 grad_data = self.momentum_buffer[i]
 
-            param.data -= (self.lr * grad_data)  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
+            param.data -= (self.lr * grad_data)    
 
     def has_momentum(self) -> bool:
         return self.momentum > 0
@@ -124,16 +124,16 @@ class Adam(Optimizer):
                 self.v_buffers[i] = np.zeros_like(param.grad)
 
             # 1. Update biased moments
-            self.m_buffers[i] = self.beta1 * self.m_buffers[i] + (1 - self.beta1) * param.grad  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
-            self.v_buffers[i] = self.beta2 * self.v_buffers[i] + (1 - self.beta2) * (param.grad**2)  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
+            self.m_buffers[i] = self.beta1 * self.m_buffers[i] + (1 - self.beta1) * param.grad    
+            self.v_buffers[i] = self.beta2 * self.v_buffers[i] + (1 - self.beta2) * (param.grad**2)    
 
             # Compute bias correction
             bias_correction1:float = 1 - self.beta1 ** self.step_count
             bias_correction2:float = 1 - self.beta2 ** self.step_count
 
             # 2. Compute bias-corrected moments
-            m_hat = self.m_buffers[i] / bias_correction1 # pyright: ignore[reportOptionalOperand]  # ty:ignore[unsupported-operator]
-            v_hat = self.v_buffers[i] / bias_correction2 # pyright: ignore[reportOptionalOperand]  # ty:ignore[unsupported-operator]
+            m_hat = self.m_buffers[i] / bias_correction1  
+            v_hat = self.v_buffers[i] / bias_correction2  
 
             # 3. Update parameter (Adaptive step)
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
@@ -172,15 +172,15 @@ class AdamW(Optimizer):
             grad_data = param.grad
 
             # Update moments using pure gradients (NO weight decay mixed in)
-            self.m_buffers[i] = self.beta1 * self.m_buffers[i] + (1 - self.beta1) * grad_data  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
-            self.v_buffers[i] = self.beta2 * self.v_buffers[i] + (1 - self.beta2) * (grad_data ** 2)  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOperatorIssue]
+            self.m_buffers[i] = self.beta1 * self.m_buffers[i] + (1 - self.beta1) * grad_data    
+            self.v_buffers[i] = self.beta2 * self.v_buffers[i] + (1 - self.beta2) * (grad_data ** 2)    
 
             # Compute bias correction and bias-corrected moments
             bias_correction1 = 1 - self.beta1 ** self.step_count
             bias_correction2 = 1 - self.beta2 ** self.step_count
 
-            m_hat = self.m_buffers[i] / bias_correction1  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOptionalOperand]
-            v_hat = self.v_buffers[i] / bias_correction2  # ty:ignore[unsupported-operator]  # pyright: ignore[reportOptionalOperand]
+            m_hat = self.m_buffers[i] / bias_correction1   
+            v_hat = self.v_buffers[i] / bias_correction2   
 
             # Apply decoupled weight decay (separate from gradient update)
             if self.weight_decay != 0:
