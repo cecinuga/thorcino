@@ -40,7 +40,7 @@ $$
 Where $\mathbf{H}_t$ equals:
 
 $$
-\mathbf{H}_t = \phi_h \left( \mathbf{X}_t \mathbf{W}_{xh} + \mathbf{H}_{t-1} + \mathbf{b}_h \right)
+\mathbf{H}_t = \phi_h \left( \mathbf{X}_t \mathbf{W}_{xh} + \mathbf{H}_{t-1} \mathbf{W}_{hh} + \mathbf{b}_h \right)
 $$
 
 ---
