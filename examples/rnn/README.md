@@ -16,9 +16,9 @@ The RNN can learn through a variation of classic Back Propagation algorithm call
 
 $t$ is the time step
 
-$n$ is the number of samples
+$n$ is the number of samples (or the batch size)
 
-$d$ is the number of input for each sample
+$d$ is the number of input for each sample (or the number of features)
 
 $h$ is the number of hidden units
 
