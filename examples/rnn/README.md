@@ -1,6 +1,8 @@
 ## Recurrent Neural Network (RNN)
 
-The aim of this notebook is to show a full example of how to implement from scratch a RNN, first using only NumPy and then using thorcino (this frameworks), building the necessary components to make it a component of this framework.
+The aim of this notebook is to show a full example of how to implement from scratch a RNN, first using only NumPy and then using thorcino (this framework), building the necessary components to make it a reusable and composable module of this framework.
+
+See [scratch.ipynb](./scratch.ipynb) for the full, runnable implementation.
 
 
 ## Introduction
@@ -10,6 +12,11 @@ A RNN is a type of neural network that embed the concept of time **implicity** i
 **implicity** means that *time* is **not** and explicit input dimension/axes, it's not encoded into the input data, but it's implicitly present in how model learn.
 
 The RNN can learn through a variation of classic Back Propagation algorithm called Back Propagation Through Time (BPTT). This algorithm is used to train RNNs by unrolling the network in time and applying the standard backpropagation algorithm to the unrolled network.
+
+
+## The Learning Task
+
+The notebook trains the RNN on a simple, but general enough, task: predicting the next number in a sequence of equidistant ordered numbers. Random sequences are generated with NumPy, and for each sequence the input $X$ is the sequence itself while the target $Y$ is the same sequence shifted by one step.
 
 
 ## Notation
@@ -42,6 +49,61 @@ Where $\mathbf{H}_t$ equals:
 $$
 \mathbf{H}_t = \phi_h \left( \mathbf{X}_t \mathbf{W}_{xh} + \mathbf{H}_{t-1} \mathbf{W}_{hh} + \mathbf{b}_h \right)
 $$
+
+
+## Gradient computation (Back Propagation Through Time)
+
+The loss over a sequence is the sum of the per-step losses:
+
+$$
+\mathcal{L} \left( \mathbf{O}, \mathbf{Y} \right)
+= \sum_{t=1}^{T} \ell_t \left( \mathbf{O}_t, \mathbf{Y}_t \right)
+$$
+
+Since $\mathbf{W}_{xh}$ and $\mathbf{W}_{hh}$ are shared across all time steps, their gradients accumulate contributions from every step, unrolled back through time:
+
+$$
+\begin{aligned}
+\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{hh}}
+&= \sum_{t=1}^{T} \frac{\partial \ell_t}{\partial \mathbf{O}_t}
+   \cdot \frac{\partial \mathbf{O}_t}{\partial \phi_o}
+   \cdot \mathbf{W}_{ho}
+   \sum_{k=1}^{t} \left( \mathbf{W}_{hh}^{\top} \right)^{t-k}
+   \cdot \mathbf{H}_k \\[1em]
+\frac{\partial \mathcal{L}}{\partial \mathbf{W}_{xh}}
+&= \sum_{t=1}^{T} \frac{\partial \ell_t}{\partial \mathbf{O}_t}
+   \cdot \frac{\partial \mathbf{O}_t}{\partial \phi_o}
+   \cdot \mathbf{W}_{ho}
+   \sum_{k=1}^{t} \left( \mathbf{W}_{hh}^{\top} \right)^{t-k}
+   \cdot \mathbf{X}_k
+\end{aligned}
+$$
+
+In the notebook, this is implemented by iterating backwards over the cached time steps, accumulating the gradients of `Wxh`, `Whh`, `bh`, `Who` and `bo`, and propagating the hidden-state gradient (`dH_next`) to the previous time step.
+
+
+## Optimizer: Stochastic Gradient Descent (SGD)
+
+The network is trained with plain SGD, with optional weight decay ($\lambda$) on the weight matrices (not on the biases), and a cosine learning-rate schedule that anneals the learning rate from a max to a min value over the training epochs:
+
+$$
+\begin{equation}
+\hat{g}_t^{(i)} =
+\begin{cases}
+\nabla_\theta \mathcal{L}(\theta_t^{(i)}) + \lambda \, \theta_t^{(i)} & \text{if } \theta^{(i)} \in \mathcal{W} \\[4pt]
+\nabla_\theta \mathcal{L}(\theta_t^{(i)}) & \text{otherwise}
+\end{cases}
+\end{equation}
+
+\begin{equation}
+\theta_{t+1}^{(i)} = \theta_t^{(i)} - \eta \, \hat{g}_t^{(i)}
+\end{equation}
+$$
+
+
+## Training and Inference
+
+Each training step runs a full forward pass over the sequence, computes the loss with `thorcino.functions.mse`, backpropagates through time, and applies an SGD step. Inference reuses the same forward recurrence (without computing the loss) to roll the hidden state forward and produce a prediction at each time step.
 
 ---
 
