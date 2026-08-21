@@ -105,6 +105,10 @@ $$
 
 Each training step runs a full forward pass over the sequence, computes the loss with `thorcino.functions.mse`, backpropagates through time, and applies an SGD step. Inference reuses the same forward recurrence (without computing the loss) to roll the hidden state forward and produce a prediction at each time step.
 
+![Training loss over 500 epochs](./loss.png)
+
+The plot above shows the training loss (summed MSE over the sequence) across the 500 training epochs used in the notebook. The loss drops sharply in the first epochs, thanks to the higher learning rate at the start of the cosine schedule, then keeps decreasing more gradually as the learning rate anneals towards `MIN_LR`, indicating the RNN is converging on the next-number-in-sequence task.
+
 ---
 
 Resources:
