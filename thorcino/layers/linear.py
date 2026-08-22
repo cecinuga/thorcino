@@ -1,7 +1,7 @@
 from typing import override
 import numpy as np
 from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
-from thorcino.layers.sequential import Layer
+from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 

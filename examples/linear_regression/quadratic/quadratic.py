@@ -3,7 +3,7 @@ from thorcino.optimizer import SGD
 from thorcino.tensor import Tensor
 from thorcino.losses import MSELoss
 from thorcino.training import Trainer, CosineSchedule
-from thorcino.layers.sequential import Sequential, Linear
+from thorcino.layers import Sequential, Linear
 import numpy as np
 import matplotlib.pyplot as plt
 

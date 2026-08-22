@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import override, TYPE_CHECKING
 import numpy as np
 from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
-from thorcino.layers import Layer
+from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 if TYPE_CHECKING:

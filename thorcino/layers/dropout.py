@@ -1,6 +1,6 @@
 import numpy as np
 from typing import override
-from thorcino.layers.sequential import Layer
+from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 class Dropout(Layer):
