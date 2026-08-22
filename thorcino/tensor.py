@@ -101,7 +101,7 @@ class Tensor:
         if isinstance(other, np.ndarray):
             return Tensor(self.data > other)
         return Tensor(self.data > other)
-
+    
     def matmul(self, other: Tensor | np.ndarray) -> Tensor:
         if len(self.shape) >= 2 and len(other.shape) >= 2:
             if self.shape[-1] != other.shape[-2]:
