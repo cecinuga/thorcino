@@ -9,7 +9,7 @@ import graphviz
 from thorcino.tensor import Tensor
 
 if TYPE_CHECKING:
-    from thorcino.layers import Layer
+    from thorcino.layers.sequential import Layer
     from thorcino.autograd import Function
 
 

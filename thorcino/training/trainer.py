@@ -3,7 +3,7 @@ import numpy as np
 from pathlib import Path
 
 from thorcino.losses import Loss
-from thorcino.layers import Layer
+from thorcino.layers.sequential import Layer
 from thorcino.tensor import Tensor
 from thorcino.training.schedulers import Schedule
 from thorcino.dataset import DataLoader

@@ -1,5 +1,5 @@
 from typing import override
-from thorcino.layers import Layer
+from thorcino.layers.sequential import Layer
 from thorcino.tensor import Tensor
 from thorcino.functions import relu, sigmoid, tanh, gelu, softmax
 from thorcino.autograd import ReLUBackward, SigmoidBackward, TanhBackward, GELUBackward, SoftmaxBackward
