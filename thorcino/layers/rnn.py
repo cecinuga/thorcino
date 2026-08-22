@@ -11,9 +11,9 @@ class RNN(Layer):
         in_feature: int,
         out_feature:int,
         hidden_units:int,
+        activation:Layer,
         bias_hidden:bool = True,
         bias_out:bool = True,
-        activation = Layer,
     ):
         self.training = True
         self.in_feature = in_feature
@@ -29,7 +29,7 @@ class RNN(Layer):
         weights_data = np.random.randn(hidden_units, out_feature) * scale
         self.weights_output = Tensor(weights_data, role=WEIGHTS_ROLE)
 
-        weights_data = np.random.rand(hidden_units, hidden_units) * scale
+        weights_data = np.random.randn(hidden_units, hidden_units) * scale
         self.weighs_hidden = Tensor(weights_data, role=WEIGHTS_ROLE)
         
         if bias_out:
@@ -77,12 +77,19 @@ class RNN(Layer):
             X_t = Tensor(X.data[:, t].reshape(-1, self.in_feature))
             
             Hprev = Ht
-            Ht = self.activation(X_t @ self.weights_input + Hprev @ self.weighs_hidden + self.bias_hidden)
-            out = Ht @ self.weights_output + self.bias_out
+            Ht = X_t @ self.weights_input + Hprev @ self.weighs_hidden
+            if self.bias_hidden is not None:
+                Ht += self.bias_hidden
+
+            Ht = self.activation(Ht)
+            out = Ht @ self.weights_output
+
+            if self.bias_out is not None:
+                out += self.bias_out
 
             outs.append(out)
 
-        return Tensor.stack(outs)
+        return Tensor.stack(outs, axis=1)
     
     @override
     def train(self) -> None:
