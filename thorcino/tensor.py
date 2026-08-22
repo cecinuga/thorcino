@@ -27,6 +27,10 @@ class Tensor:
             return f"Tensor=(role={self.role},shape={self.shape}, size={self.size}, dtype={self.dtype})"
         return f"Tensor=(shape={self.shape}, size={self.size}, dtype={self.dtype})"
 
+    @property
+    def dim(self) -> int:
+        return len(self.data.shape)
+
     @override
     def __str__(self) -> str:
         return f"Tensor({self.data})"
