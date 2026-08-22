@@ -11,7 +11,8 @@ class RNN(Layer):
         in_feature: int,
         out_feature:int,
         hidden_units:int,
-        activation:Layer,
+        h_activation:Layer,
+        o_activation:Layer,
         bias_hidden:bool = True,
         bias_out:bool = True,
     ):
@@ -19,7 +20,8 @@ class RNN(Layer):
         self.in_feature = in_feature
         self.out_feature = out_feature
         self.hidden_units = hidden_units
-        self.activation = activation
+        self.h_activation = h_activation
+        self.o_activation = o_activation
 
         scale = np.sqrt(1.0 / in_feature)
         weights_data = np.random.randn(in_feature, hidden_units) * scale
@@ -80,12 +82,12 @@ class RNN(Layer):
             Ht = X_t @ self.weights_input + Hprev @ self.weighs_hidden
             if self.bias_hidden is not None:
                 Ht += self.bias_hidden
+            Ht = self.h_activation(Ht)
 
-            Ht = self.activation(Ht)
             out = Ht @ self.weights_output
-
             if self.bias_out is not None:
                 out += self.bias_out
+            out = self.o_activation(out)
 
             outs.append(out)
 

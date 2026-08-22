@@ -51,7 +51,7 @@ class Sigmoid(Layer):
         res = Tensor(sigmoid(x.data))
         if self.training:
             res._grad_fn = SigmoidBackward(x)
-        return Tensor(res)
+        return res
 
     @override
     def train(self) -> None:
