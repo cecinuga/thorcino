@@ -72,6 +72,7 @@ class Trainer:
         for batch_idx, (inputs, targets) in enumerate(dataloader):
             # 1. Forward pass
             preds = self.model(inputs)
+            print(inputs, targets, preds)
             loss = self.loss_fn(preds, targets)
 
             # 2. Scale loss for accumulation

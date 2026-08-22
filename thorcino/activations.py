@@ -2,44 +2,118 @@ from typing import override
 from thorcino.layers import Layer
 from thorcino.tensor import Tensor
 from thorcino.functions import relu, sigmoid, tanh, gelu, softmax
-from thorcino.autograd import ReLUBackward, SigmoidBackward, TanhBackward, GELUBackward, SoftmaxBackward
+from thorcino.autograd import IdentityBackward, ReLUBackward, SigmoidBackward, TanhBackward, GELUBackward, SoftmaxBackward
+
+class Identity(Layer):
+    def __init__(self):
+        self.training = True
+
+    @override
+    def forward(self, x: Tensor) -> Tensor:
+        res = Tensor(x.data)
+        if self.training:
+            res._grad_fn = IdentityBackward(x)
+        return res
+
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
 
 class ReLU(Layer):
+    def __init__(self):
+        self.training = True
+
     @override
     def forward(self, x: Tensor) -> Tensor:
         res = Tensor(relu(x.data))
-        if res.requires_grad:
+        if self.training:
             res._grad_fn = ReLUBackward(x)
         return res
 
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
+
 class Sigmoid(Layer):
+    def __init__(self):
+        self.training = True
+
     @override
     def forward(self, x: Tensor) -> Tensor:
         res = Tensor(sigmoid(x.data))
-        if res.requires_grad:
+        if self.training:
             res._grad_fn = SigmoidBackward(x)
         return Tensor(res)
 
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
+
 class Tanh(Layer):
+    def __init__(self):
+        self.training = True
+
     @override
     def forward(self, x: Tensor) -> Tensor:
         res = Tensor(tanh(x.data))
-        if res.requires_grad:
+        if self.training:
             res._grad_fn = TanhBackward(x)
         return res
+    
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
 
 class GELU(Layer):
+    def __init__(self):
+        self.training = True
+
     @override
     def forward(self, x: Tensor) -> Tensor:
         res = Tensor(gelu(x.data))
-        if res.requires_grad:
+        if self.training:
             res._grad_fn = GELUBackward(x)
         return res
+    
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
 
 class Softmax(Layer):
+    def __init__(self):
+        self.training = True
+
     @override
     def forward(self, x: Tensor, dim: int = -1) -> Tensor:
         res = Tensor(softmax(x.data, dim))
-        if res.requires_grad:
+        if self.training:
             res._grad_fn = SoftmaxBackward(x, dim)
         return res
+
+    @override
+    def train(self) -> None:
+        self.training = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False

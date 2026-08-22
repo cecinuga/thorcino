@@ -4,6 +4,17 @@ from thorcino.tensor import Tensor
 from thorcino.utils import unbroadcast
 from thorcino.autograd.base import Function
 
+class IdentityBackward(Function):
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        a, = self.saved_tensors
+        out = np.array([])
+
+        if a.requires_grad:
+            out = grad_output.data
+
+        return Tensor(out),
+
 class AddBackward(Function):
     @override
     def apply(self, grad_output: Tensor)-> tuple[Tensor, Tensor]:
@@ -103,7 +114,7 @@ class ReshapeBackward(Function):
         out = np.array([])
 
         if a.requires_grad:
-            out = np.reshape(grad_output.data, a.shape),
+            out = np.reshape(grad_output.data, a.shape)
 
         return Tensor(out),
 
@@ -114,6 +125,19 @@ class TransposeBackward(Function):
         out = np.array([])
 
         if t.requires_grad:
-            out = np.transpose(grad_output.data),
+            out = np.transpose(grad_output.data)
 
         return Tensor(out),
+
+class StackBackward(Function):
+    """Backward for `Tensor.stack`: splits the incoming gradient back into
+    one chunk per stacked input, along the axis they were stacked on."""
+
+    def __init__(self, *tensors: Tensor, axis: int = 0):
+        super().__init__(*tensors)
+        self.axis: int = axis
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        chunks = np.split(grad_output.data, len(self.saved_tensors), axis=self.axis)
+        return tuple(Tensor(np.squeeze(chunk, axis=self.axis)) for chunk in chunks)

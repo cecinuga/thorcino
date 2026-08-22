@@ -1,6 +1,7 @@
 from typing import override
 import numpy as np
 from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
+from thorcino.functions import relu, sigmoid, tanh, gelu
 from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
@@ -12,15 +13,13 @@ class RNN(Layer):
         hidden_units:int,
         bias_hidden:bool = True,
         bias_out:bool = True,
-        hidden_activation = np.tanh,
-        out_activation = np.tanh
+        activation = Layer,
     ):
         self.training = True
         self.in_feature = in_feature
         self.out_feature = out_feature
         self.hidden_units = hidden_units
-        self.h_activation = hidden_activation
-        self.out_activation = out_activation
+        self.activation = activation
 
         scale = np.sqrt(1.0 / in_feature)
         weights_data = np.random.randn(in_feature, hidden_units) * scale
@@ -39,7 +38,7 @@ class RNN(Layer):
             self.bias_out = None
 
         if bias_hidden:
-            self.bias_hidden = Tensor(np.zeros(out_feature), role=BIAS_ROLE)
+            self.bias_hidden = Tensor(np.zeros(hidden_units), role=BIAS_ROLE)
         else:
             self.bias_hidden = None
 
@@ -58,31 +57,32 @@ class RNN(Layer):
 
         Params
         ------
-        X: inputs, shape=(batch_size, sequence_length, in_feature), last ax optional
+        X: inputs, possible shapes: 
+            (batch_size, sequence_length, in_feature), 
+            (batch_size, sequence_length), 
+            (sequence_length)
 
         Returns
         -------
-        cache: if training mode is on for each `t` it contains `Hprev`, `Ht`, `out`, otherwise only `out`
+        outs: output for each step stacked along first dim
         """
+        if X.dim == 1:
+            X = X.reshape(1, -1)
+
         batch_size, seq_len = X.shape[0], X.shape[1]
-        Ht = np.zeros((batch_size, self.hidden_units))
+        Ht = Tensor(np.zeros((batch_size, self.hidden_units)))
         
-        cache = []
+        outs = []
         for t in range(seq_len):
-            X_t = X[:, t].reshape(-1, self.in_feature)
+            X_t = Tensor(X.data[:, t].reshape(-1, self.in_feature))
             
             Hprev = Ht
-            Ht = self.h_activation( X_t @ self.weights_input + Hprev @ self.weighs_hidden + self.bias_hidden ) 
-            out = self.out_activation( Ht @ self.weights_output + self.bias_out )
+            Ht = self.activation(X_t @ self.weights_input + Hprev @ self.weighs_hidden + self.bias_hidden)
+            out = Ht @ self.weights_output + self.bias_out
 
-            if self.training:
-                history = {'Hprev':Hprev, 'Ht': Ht, 'out': out}
-            else:
-                history = {'out': out}
+            outs.append(out)
 
-            self.cache.append(history)
-
-        return cache
+        return Tensor.stack(outs)
     
     @override
     def train(self) -> None:

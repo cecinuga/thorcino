@@ -39,7 +39,7 @@ class Tensor:
         return self.data
 
     def __getitem__(self, idx: int) -> np.ndarray:
-        return self.data[idx]
+        return Tensor(self.data[idx], requires_grad=self.requires_grad)
 
     def __len__(self) -> int:
         return len(self.data)
@@ -199,6 +199,17 @@ class Tensor:
             for tensor, grad in zip(self._grad_fn.saved_tensors, grads):
                 if tensor.requires_grad:
                     tensor.backward(grad)
+
+    @staticmethod
+    def stack(tensors: list["Tensor"], axis: int = 0) -> "Tensor":
+        """Stack a list of tensors along a new axis, keeping them wired into
+        the autograd graph (unlike ``Tensor(np.stack(...))``, which builds a
+        fresh leaf tensor with no ``_grad_fn``)."""
+        out = Tensor(np.stack([t.data for t in tensors], axis=axis))
+        if any(t.requires_grad for t in tensors):
+            from thorcino.autograd import StackBackward
+            out._grad_fn = StackBackward(*tensors, axis=axis)
+        return out
 
     def zero_grad(self) -> None:
         """Reset gradients to None."""
