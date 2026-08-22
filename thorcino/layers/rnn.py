@@ -1,3 +1,4 @@
+from typing import override
 import numpy as np
 from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
 from thorcino.layers.layer import Layer
@@ -42,9 +43,11 @@ class RNN(Layer):
         else:
             self.bias_hidden = None
 
+    @override
     def __repr__(self) -> str:
         return f"{type(self).__name__}(in_feature={self.in_feature},out_feature={self.out_feature},hidden_units={self.hidden_units},bias_hidden={self.bias_hidden},bias_out={self.bias_out})"
 
+    @override
     def forward(self, X: Tensor) -> Tensor:
         """
         Compute the layer output: 
@@ -80,3 +83,43 @@ class RNN(Layer):
             self.cache.append(history)
 
         return cache
+    
+    @override
+    def train(self) -> None:
+        self.training = True
+        self.weights_input.requires_grad = True
+        self.weighs_hidden.requires_grad = True
+        self.weights_output.requires_grad = True
+
+        if self.bias_hidden is not None:
+            self.bias_hidden.requires_grad = True
+        
+        if self.bias_out is not None:
+            self.bias_out.requires_grad = True
+
+    @override
+    def eval(self) -> None:
+        self.training = False
+        self.weights_input.requires_grad = False
+        self.weighs_hidden.requires_grad = False
+        self.weights_output.requires_grad = False
+
+        if self.bias_hidden is not None:
+            self.bias_hidden.requires_grad = False
+        
+        if self.bias_out is not None:
+            self.bias_out.requires_grad = False
+
+
+    @property
+    @override
+    def parameters(self):
+        params = [self.weights_input, self.weighs_hidden, self.weights_output]
+
+        if self.bias_hidden is not None:
+            params.append(self.bias_hidden)
+        
+        if self.bias_out is not None:
+            params.append(self.bias_out)
+
+        return params
