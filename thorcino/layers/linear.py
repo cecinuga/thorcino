@@ -38,16 +38,16 @@ class Linear(Layer):
     @override
     def train(self) -> None:
         self.training = True
-        self.weights.requires_grad=True
+        self.weights.requires_grad = True
         if self.bias is not None:
-            self.bias.requires_grad=True
+            self.bias.requires_grad = True
 
     @override
     def eval(self) -> None:
         self.training = False
-        self.weights.requires_grad=False
+        self.weights.requires_grad = False
         if self.bias is not None:
-            self.bias.requires_grad=False
+            self.bias.requires_grad = False
 
     @property
     @override
