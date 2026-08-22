@@ -1,6 +1,6 @@
 import numpy as np
 from thorcino.dataset.dataset import DataLoader
-from thorcino.layers import Linear, Sequential
+from thorcino.layers.sequential import Linear, Sequential
 from thorcino.losses import MSELoss
 from thorcino.optimizer import SGD
 from thorcino.training.schedulers import CosineSchedule
