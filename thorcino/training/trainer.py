@@ -51,8 +51,7 @@ class Trainer:
 
     def _accumulate(self, total_loss: float, accumulated_loss: float, num_batches: int):
         if self.grad_clip_norm is not None:
-            params = self.model.parameters
-            _ = clip_grad_norm(params, self.grad_clip_norm)
+            _ = clip_grad_norm(self.model.parameters, self.grad_clip_norm)
 
         self.optimizer.step()
         self.optimizer.zero_grad()
