@@ -1,8 +1,11 @@
 ## Recurrent Neural Network (RNN)
 
-The aim of this notebook is to show a full example of how to implement from scratch a RNN, first using only NumPy and then using thorcino (this framework), building the necessary components to make it a reusable and composable module of this framework.
+The aim of this example is to show a full walkthrough of implementing an RNN, first from scratch using only NumPy, and then again using thorcino (this framework), turning the same recurrence into a reusable and composable module.
 
-See [scratch.ipynb](./scratch.ipynb) for the full, runnable implementation.
+The example is split across two notebooks:
+
+- [scratch.ipynb](./scratch.ipynb) — the from-scratch implementation. It hand-derives and hand-codes the forward pass (`compute_H`, `compute_output`), Back Propagation Through Time (`backward`), and a plain SGD optimizer (`update`/`optimize`), all with raw NumPy arrays and dicts of parameters. This is where the math in this README (hidden-state recurrence, BPTT gradients, SGD update rule) is implemented step by step and is the best place to start to understand *how* an RNN actually learns.
+- [main.ipynb](./main.ipynb) — the thorcino implementation. It builds the same next-number-in-sequence task on top of the framework's own `RNN` layer (`thorcino.layers.RNN`) wrapped in a `Sequential` model, trained with `thorcino.optimizer.SGD`, a `CosineSchedule`, and the `Trainer`/`DataLoader` utilities. It also renders the model's computation graph to [images/arch.png](./images/arch.png), [images/forward.png](./images/forward.png) and [images/backward.png](./images/backward.png) via `model.save_graph(...)`, and reports per-time-step prediction tables (expected vs. predicted, with % error) for both a held-out test sequence and a training sequence.
 
 
 ## Introduction
@@ -16,7 +19,7 @@ The RNN can learn through a variation of classic Back Propagation algorithm call
 
 ## The Learning Task
 
-The notebook trains the RNN on a simple, but general enough, task: predicting the next number in a sequence of equidistant ordered numbers. Random sequences are generated with NumPy, and for each sequence the input $X$ is the sequence itself while the target $Y$ is the same sequence shifted by one step.
+Both notebooks train the RNN on a simple, but general enough, task: predicting the next number in a sequence of equidistant ordered numbers. Random sequences are generated with NumPy, and for each sequence the input $X$ is the sequence itself while the target $Y$ is the same sequence shifted by one step.
 
 
 ## Notation
@@ -79,7 +82,7 @@ $$
 \end{aligned}
 $$
 
-In the notebook, this is implemented by iterating backwards over the cached time steps, accumulating the gradients of `Wxh`, `Whh`, `bh`, `Who` and `bo`, and propagating the hidden-state gradient (`dH_next`) to the previous time step.
+In [scratch.ipynb](./scratch.ipynb), this is implemented explicitly by iterating backwards over the cached time steps, accumulating the gradients of `Wxh`, `Whh`, `bh`, `Who` and `bo`, and propagating the hidden-state gradient (`dH_next`) to the previous time step. In [main.ipynb](./main.ipynb) the same BPTT recurrence is handled internally by thorcino's autograd engine when `Trainer` backpropagates through the unrolled `RNN` layer.
 
 
 ## Optimizer: Stochastic Gradient Descent (SGD)
@@ -103,11 +106,19 @@ $$
 
 ## Training and Inference
 
-Each training step runs a full forward pass over the sequence, computes the loss with `thorcino.functions.mse`, backpropagates through time, and applies an SGD step. Inference reuses the same forward recurrence (without computing the loss) to roll the hidden state forward and produce a prediction at each time step.
+### scratch.ipynb
 
-![Training loss over 500 epochs](./loss.png)
+Each training step runs a full forward pass over the sequence (`forward`), computes the loss with a hand-rolled MSE (`thorcino.functions.mse`), backpropagates through time (`backward`), and applies a manual SGD step (`optimize`) — 100 epochs, `MAX_LR=1e-3`, `MIN_LR=1e-6`, cosine-annealed, on `N=10` sequences of length `T=5` with `H=2` hidden units. Inference (`infer`) reuses the same forward recurrence, without computing the loss, to roll the hidden state forward and produce a prediction at each time step.
 
-The plot above shows the training loss (summed MSE over the sequence) across the 500 training epochs used in the notebook. The loss drops sharply in the first epochs, thanks to the higher learning rate at the start of the cosine schedule, then keeps decreasing more gradually as the learning rate anneals towards `MIN_LR`, indicating the RNN is converging on the next-number-in-sequence task.
+![Training loss over 100 epochs](./loss.png)
+
+The plot above shows the training loss (summed MSE over the sequence) across the 100 training epochs used in the notebook. The loss drops sharply in the first epochs, thanks to the higher learning rate at the start of the cosine schedule, then keeps decreasing more gradually as the learning rate anneals towards `MIN_LR`, indicating the RNN is converging on the next-number-in-sequence task.
+
+### main.ipynb
+
+The thorcino version trains the same task through the framework's `Trainer`: each epoch calls `trainer.train_epoch(loader_tr)` over batches from a `DataLoader`/`TensorDataset` pair, with periodic `trainer.eval(loader_te)` calls on a held-out test set. The model is a single `RNN` layer (`d=1` input feature, `h=2` hidden units, `o=1` output feature, `Identity` activations) inside a `Sequential`, trained for 50 epochs with `SGD` (`MAX_LR=1e-5`, `MIN_LR=1e-8`, momentum `0.7`) under a `CosineSchedule`, on `N=1000` random sequences of length `T=5` (`min_start=30` for training, `min_start=45` for testing). Before training, `model.save_graph(...)` dumps the model's static architecture and the forward/backward computation graphs to [images/arch.png](./images/arch.png), [images/forward.png](./images/forward.png) and [images/backward.png](./images/backward.png).
+
+At inference time (`model.eval()` + a forward call), the notebook prints per-time-step comparison tables (expected vs. predicted vs. % error) for a test sequence and a training sequence, showing errors in roughly the 2–13% range across the 5 steps — the prediction error grows with `t` since each step's hidden state compounds the approximation error of the previous one.
 
 ---
 
