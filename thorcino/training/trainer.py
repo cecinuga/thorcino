@@ -78,8 +78,11 @@ class Trainer:
             scaled_loss = loss.data / accumulation_steps
             accumulated_loss += float(scaled_loss)
 
-            # 3. Backward pass (accumulates into .grad)
-            loss.backward()
+            # 3. Backward pass (accumulates into .grad).
+            # Scale the seed gradient here, not `loss` itself: Tensor.__truediv__
+            # by a plain scalar returns a fresh leaf with no _grad_fn, which would
+            # sever the graph and make backward() a no-op.
+            loss.backward(Tensor(np.array(1.0 / accumulation_steps, dtype=np.float32)))
 
             # Only update every 'accumulation_steps'
             if (batch_idx + 1) % accumulation_steps == 0:
