@@ -47,10 +47,10 @@ class LSTM(Layer):
         weights_data = np.random.randn(hidden_units, hidden_units) * scale
         self.weights_h_cell = Tensor(weights_data, role=WEIGHTS_ROLE)
 
-        self.bias_input = Tensor(np.zeros(1, hidden_units), role=BIAS_ROLE)
-        self.bias_forget = Tensor(np.zeros(1, hidden_units), role=BIAS_ROLE)
-        self.bias_output = Tensor(np.zeros(1, hidden_units), role=BIAS_ROLE)
-        self.bias_cell = Tensor(np.zeros(1, hidden_units), role=BIAS_ROLE)
+        self.bias_input = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
+        self.bias_forget = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
+        self.bias_output = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
+        self.bias_cell = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
 
     
     @override
@@ -111,7 +111,7 @@ class LSTM(Layer):
             Mt = Ft * Mprev + It * Ct
             Ht = Ot * self.tanh(Mt)           
 
-            outs.append(Ot)
+            outs.append(Ht)
 
         return Tensor.stack(outs, axis=1)
     
