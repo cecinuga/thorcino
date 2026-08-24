@@ -115,7 +115,6 @@ class LSTM(Layer):
 
         return Tensor.stack(outs, axis=1)
     
-
     @property
     @override
     def parameters(self) -> list[Tensor]:
