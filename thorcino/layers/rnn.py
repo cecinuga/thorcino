@@ -9,19 +9,19 @@ class RNN(Layer):
     def __init__(
         self, 
         in_feature: int,
-        out_feature:int,
-        hidden_units:int,
-        h_activation:Layer,
-        o_activation:Layer,
-        bias_hidden:bool = True,
-        bias_out:bool = True,
+        out_feature: int,
+        hidden_units: int,
+        activation_h: Layer,
+        activation_o: Layer,
+        bias_hidden: bool = True,
+        bias_out: bool = True,
     ):
         self.training = True
         self.in_feature = in_feature
         self.out_feature = out_feature
         self.hidden_units = hidden_units
-        self.h_activation = h_activation
-        self.o_activation = o_activation
+        self.activation_h = activation_h
+        self.activation_o = activation_o
 
         scale = np.sqrt(1.0 / in_feature)
         weights_data = np.random.randn(in_feature, hidden_units) * scale
@@ -46,14 +46,14 @@ class RNN(Layer):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature},out_feature={self.out_feature},hidden_units={self.hidden_units},bias_hidden={self.bias_hidden},bias_out={self.bias_out})"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden}, bias_out={self.bias_out})"
 
     @override
     def forward(self, X: Tensor) -> Tensor:
         """
         Compute the layer output: 
 
-        `H_t = phi_h(X_t @ W_xh + H_{t-1} @ W_hh + b_h)`
+        `H_t = phi_h(Xt @ W_xh + H_{t-1} @ W_hh + b_h)`
         
         `O_t = phi_o(H_t @ W_ho + b_o)`
 
@@ -76,26 +76,40 @@ class RNN(Layer):
         
         outs = []
         for t in range(seq_len):
-            X_t = Tensor(X.data[:, t].reshape(-1, self.in_feature))
+            Xt = Tensor(X.data[:, t].reshape(-1, self.in_feature))
             
             Hprev = Ht
-            Ht = X_t @ self.weights_input + Hprev @ self.weighs_hidden
+            Ht = Xt @ self.weights_input + Hprev @ self.weighs_hidden
             if self.bias_hidden is not None:
                 Ht += self.bias_hidden
-            Ht = self.h_activation(Ht)
+            Ht = self.activation_h(Ht)
 
             out = Ht @ self.weights_output
             if self.bias_out is not None:
                 out += self.bias_out
-            out = self.o_activation(out)
+            out = self.activation_o(out)
 
             outs.append(out)
 
         return Tensor.stack(outs, axis=1)
     
+    @property
+    @override
+    def parameters(self) -> list[Tensor]:
+        params = [self.weights_input, self.weighs_hidden, self.weights_output]
+
+        if self.bias_hidden is not None:
+            params.append(self.bias_hidden)
+        
+        if self.bias_out is not None:
+            params.append(self.bias_out)
+
+        return params
+
     @override
     def train(self) -> None:
         self.training = True
+
         self.weights_input.requires_grad = True
         self.weighs_hidden.requires_grad = True
         self.weights_output.requires_grad = True
@@ -109,6 +123,7 @@ class RNN(Layer):
     @override
     def eval(self) -> None:
         self.training = False
+
         self.weights_input.requires_grad = False
         self.weighs_hidden.requires_grad = False
         self.weights_output.requires_grad = False
@@ -118,17 +133,3 @@ class RNN(Layer):
         
         if self.bias_out is not None:
             self.bias_out.requires_grad = False
-
-
-    @property
-    @override
-    def parameters(self):
-        params = [self.weights_input, self.weighs_hidden, self.weights_output]
-
-        if self.bias_hidden is not None:
-            params.append(self.bias_hidden)
-        
-        if self.bias_out is not None:
-            params.append(self.bias_out)
-
-        return params
