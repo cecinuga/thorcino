@@ -10,6 +10,56 @@ The goal is not performance but clarity: every gradient is computed by hand in a
 explicit backward class, so you can read exactly how backpropagation flows through
 the computation graph.
 
+## Quick start
+
+Everything you normally need is re-exported from the top-level package, so a
+whole training run fits in a handful of lines:
+
+```python
+import numpy as np
+from thorcino import Tensor, Sequential, Linear, MSELoss, SGD, Trainer, TensorDataset, DataLoader
+
+rng = np.random.default_rng(0)
+
+# 1. A noisy dataset for y = 2x + 5
+x = np.linspace(-5, 5, 200).reshape(-1, 1)
+y = 2 * x + 5 + rng.normal(0, 0.5, x.shape)
+loader = DataLoader(TensorDataset(Tensor(x), Tensor(y)), batch_size=32, shuffle=True)
+
+# 2. A one-layer model, a loss and an optimizer
+model = Sequential(Linear(1, 1))
+trainer = Trainer(model, MSELoss(), SGD(model.parameters, lr=1e-2))
+
+# 3. Train
+for epoch in range(50):
+    loss = trainer.train_epoch(loader)
+
+# 4. Read the recovered coefficients back off the parameters
+w, b = model.parameters
+print(f"loss={loss:.4f}  w={w.data.item():.3f}  b={b.data.item():.3f}")
+# loss=0.2211  w=1.988  b=4.997  <- recovers 2 and 5; Xavier init and the
+# shuffling are unseeded, so the exact digits move a little between runs
+```
+
+To poke at the autograd engine directly, skip the layers entirely — any
+`Tensor` produced by an operation carries the backward node that made it, and
+`backward()` walks that graph for you:
+
+```python
+from thorcino import Tensor
+
+a = Tensor([[1.0, 2.0]])
+b = Tensor([[3.0], [4.0]])
+
+c = (a @ b).sum()
+c.backward()
+
+print(c.data)              # 11.0
+print(a.grad)              # [[3. 4.]]  -> dc/da = bᵀ
+print(b.grad)              # [[1.] [2.]] -> dc/db = aᵀ
+print(type(c._grad_fn))    # <class 'thorcino.autograd.arithmetic.SumBackward'>
+```
+
 ## Requirements
 
 - Python >= 3.14
@@ -45,6 +95,7 @@ single-responsibility modules:
 
 ```
 thorcino/
+├── __init__.py          # Flat public API: re-exports the names below
 ├── tensor.py            # Tensor: the numpy-backed frontend + operator overloading
 ├── functions.py         # Pure numpy math: activations, softmax, loss functions
 ├── activations.py       # Activation layers (Identity, ReLU, Sigmoid, Tanh, GELU, Softmax)
@@ -85,6 +136,11 @@ The design follows a clear **frontend / backend split**:
 
 Layers, activations and losses are thin objects that call into `functions.py` for
 the forward pass and attach the corresponding `Function` for the backward pass.
+
+`thorcino/__init__.py` flattens all of this into a single import surface — the
+tensor, every layer and activation, the losses, the optimizers, the trainer and
+the data-loading pieces — so day-to-day use never needs the module paths. They
+stay available if you want to read the code alongside it.
 
 ## Automatic differentiation (`thorcino/autograd/`)
 
@@ -206,8 +262,10 @@ the `requires_grad` of its parameters.
 | `LSTM`       | Long short-term memory cell with input/forget/output gates and a cell state, unrolled the same way and returning the per-step hidden states. |
 | `Sequential` | Chains layers and forwards through them in order; aggregates their parameters, and propagates `train()`/`eval()`. |
 
-`RNN` is re-exported from `thorcino.layers`; `LSTM` currently has to be imported
-from its module (`from thorcino.layers.lstm import LSTM`).
+Both recurrent layers are re-exported from the top-level package
+(`from thorcino import RNN, LSTM`). Note that `thorcino.layers` itself only
+re-exports `RNN`, so importing `LSTM` from that sub-package needs its module
+path (`from thorcino.layers.lstm import LSTM`).
 
 `Sequential.save_graph(path, arch=True, forward=False, backward=False)` renders a
 `.png` of the model via `thorcino/graph.py` (needs `graphviz`): a cluster per layer
