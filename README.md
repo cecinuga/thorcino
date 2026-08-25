@@ -1,10 +1,10 @@
-# tiny-torch
+# thorcino
 
 A minimal, educational deep-learning framework built from scratch on top of NumPy.
-`tiny-torch` reimplements the essential pieces of a PyTorch-style workflow — a
-tensor with reverse-mode automatic differentiation, a small set of layers,
-activation and loss functions, and a data-loading pipeline — in a few hundred
-lines of readable Python.
+`thorcino` reimplements the essential pieces of a PyTorch-style workflow — a
+tensor with reverse-mode automatic differentiation, a small set of layers
+(including recurrent ones), activation and loss functions, and a data-loading
+pipeline — in a few hundred lines of readable Python.
 
 The goal is not performance but clarity: every gradient is computed by hand in an
 explicit backward class, so you can read exactly how backpropagation flows through
@@ -15,39 +15,54 @@ the computation graph.
 - Python >= 3.14
 - NumPy >= 2.5.0
 - Graphviz >= 0.21
+- scikit-learn >= 1.9.0 (dataset generators used by the examples)
+- pandas >= 3.0.3
 
-Optional (dev): `ipykernel`, `matplotlib` (used by the examples).
+Optional (dev): `ipykernel`, `matplotlib`, `tabulate`, `myst_nb` (used by the
+examples and notebooks), `flake8` and `pytest` (used by CI).
 
 ## Installation
 
 The project uses [uv](https://github.com/astral-sh/uv) for environment and
-dependency management (`uv.lock` is committed).
+dependency management, with `hatchling` as the build backend.
 
 ```bash
-uv sync
+uv sync --all-groups
 ```
 
-This creates a `.venv` and installs the runtime and dev dependencies. Prebuilt
-artifacts for `tiny_torch-0.1.0` are also available under `dist/`.
+This creates a `.venv` and installs the runtime and dev dependencies. The lock
+file and build artifacts (`uv.lock`, `dist/`) are not tracked in git.
+
+Continuous integration ([`.github/workflows/python-app.yml`](.github/workflows/python-app.yml))
+runs the same `uv sync --all-groups`, then lints with `flake8` and runs
+`pytest`. There is no test suite yet, so the pytest step currently tolerates
+the "no tests collected" exit code.
 
 ## Architecture
 
-The whole library lives under `core/` and is organized in a small number of
+The whole library lives under `thorcino/` and is organized in a small number of
 single-responsibility modules:
 
 ```
-core/
+thorcino/
 ├── tensor.py            # Tensor: the numpy-backed frontend + operator overloading
 ├── functions.py         # Pure numpy math: activations, softmax, loss functions
-├── activations.py       # Activation layers (ReLU, Sigmoid, Tanh, GELU, Softmax)
+├── activations.py       # Activation layers (Identity, ReLU, Sigmoid, Tanh, GELU, Softmax)
 ├── losses.py            # Loss objects (MSE, CrossEntropy, BinaryCrossEntropy)
-├── layers.py            # Layer, Linear, Dropout, Sequential
-├── optimizer.py         # Optimizer, SGD, SGDM, Adam, AdamW
+├── optimizer.py         # Optimizer, SGD, SGD_DL2, SGDM, Adam, AdamW
 ├── graph.py             # ComputationalGraph: graphviz visualisation of a Sequential model
+├── consts.py            # Parameter role tags (WEIGHTS_ROLE, BIAS_ROLE)
 ├── utils.py             # unbroadcast() helper for gradient reduction
+├── layers/               # Network layers
+│   ├── layer.py          #   Layer: abstract base (forward, train/eval, parameters)
+│   ├── linear.py         #   Linear
+│   ├── dropout.py        #   Dropout
+│   ├── rnn.py            #   RNN (unrolled recurrence, BPTT via autograd)
+│   ├── lstm.py           #   LSTM (input/forget/output gates + cell state)
+│   └── sequential.py     #   Sequential + graph rendering helpers
 ├── autograd/            # Reverse-mode automatic differentiation
 │   ├── base.py          #   Function: base class for every backward node
-│   ├── arithmetic.py    #   Add/Sub/Mul/Div/Matmul/Sum/Reshape/Transpose backward
+│   ├── arithmetic.py    #   Identity/Add/Sub/Mul/Div/Matmul/Sum/Reshape/Transpose/Stack backward
 │   ├── activations.py   #   ReLU/Sigmoid/Tanh/GELU/Softmax backward
 │   └── losses.py        #   MSE/CrossEntropy/BCE backward
 ├── dataset/              # Data loading pipeline
@@ -55,7 +70,7 @@ core/
 │   ├── transformation.py #   RandomHorizontalFlip, RandomCrop, Compose
 │   └── utils.py          #   image loading helpers
 └── training/             # Training loop orchestration
-    ├── trainer.py         #   Trainer: train_epoch/eval, checkpointing, grad clipping
+    ├── trainer.py         #   Trainer: train_epoch/eval, checkpointing, clip_grad_norm
     └── schedulers.py      #   Schedule, CosineSchedule
 ```
 
@@ -71,15 +86,15 @@ The design follows a clear **frontend / backend split**:
 Layers, activations and losses are thin objects that call into `functions.py` for
 the forward pass and attach the corresponding `Function` for the backward pass.
 
-## Automatic differentiation (`core/autograd/`)
+## Automatic differentiation (`thorcino/autograd/`)
 
-`tiny-torch` implements **reverse-mode autodiff** by building a dynamic graph as
+`thorcino` implements **reverse-mode autodiff** by building a dynamic graph as
 operations execute (define-by-run), then walking it backwards to accumulate
 gradients.
 
 ### The `Function` node
 
-Every backward node subclasses `Function` (`core/autograd/base.py`):
+Every backward node subclasses `Function` (`thorcino/autograd/base.py`):
 
 ```python
 class Function:
@@ -113,7 +128,7 @@ produces a graph of `Function` nodes rooted at the final output.
 
 ### The backward pass
 
-`Tensor.backward()` (`core/tensor.py`) drives backpropagation recursively:
+`Tensor.backward()` (`thorcino/tensor.py`) drives backpropagation recursively:
 
 1. If no gradient is supplied, it seeds `1.0` for a scalar output (and raises for
    non-scalar outputs, matching PyTorch's behaviour).
@@ -122,7 +137,7 @@ produces a graph of `Function` nodes rooted at the final output.
 3. It calls `self._grad_fn.apply(gradient)` to get the input gradients, then
    recurses into each input tensor that `requires_grad`.
 
-Broadcasting is handled by `unbroadcast()` (`core/utils.py`), which sums a
+Broadcasting is handled by `unbroadcast()` (`thorcino/utils.py`), which sums a
 gradient back down to the shape of the original operand so that broadcasted
 operations (e.g. adding a bias vector to a batch) produce correctly-shaped
 gradients.
@@ -137,60 +152,78 @@ gradients.
 
 | Category    | Backward classes |
 |-------------|------------------|
-| Arithmetic  | `AddBackward`, `SubBackward`, `MulBackward`, `DivBackward` |
+| Arithmetic  | `AddBackward`, `SubBackward`, `MulBackward`, `DivBackward`, `IdentityBackward` |
 | Linear alg. | `MatmulBackward`, `TransposeBackward` |
 | Reductions  | `SumBackward` |
-| Shape       | `ReshapeBackward` |
+| Shape       | `ReshapeBackward`, `StackBackward` |
 | Activations | `ReLUBackward`, `SigmoidBackward`, `TanhBackward`, `GELUBackward`, `SoftmaxBackward` |
 | Losses      | `MSELossBackward`, `CrossEntropyLossBackward`, `BCELossBackward` |
 
-## The `Tensor` class (`core/tensor.py`)
+## The `Tensor` class (`thorcino/tensor.py`)
 
 `Tensor` is a lightweight wrapper around a `np.ndarray` (always stored as
 `float32`). It exposes:
 
-- **Metadata**: `data`, `shape`, `size`, `dtype`, `requires_grad`, `grad`,
-  `_grad_fn`.
+- **Metadata**: `data`, `shape`, `size`, `dim`, `dtype`, `requires_grad`, `grad`,
+  `_grad_fn`, `role`. The optional `role` tags a tensor as `weights` or `bias`
+  (see `thorcino/consts.py`); it drives per-role weight decay in the optimizers
+  and the colour coding in the graph renderer.
 - **Operator overloading**: `__add__`/`__radd__`, `__sub__`/`__rsub__`,
   `__mul__`/`__rmul__`, `__truediv__`, `__matmul__`, `__pow__`, `__neg__`,
   `__gt__`. The autograd-aware operations (`+`, `-`, `*`, `/`, `@`) attach a
   `_grad_fn`; scalar/`ndarray` fast paths return plain results.
 - **Tensor ops**: `matmul`, `reshape` (supports `-1` inference), `transpose`,
-  `sum`, `mean`, `max`, `min`.
+  `sum`, `mean`, `max`, `min`, plus `__getitem__`/`__len__` for indexing and
+  iteration.
+- **Stacking**: the `Tensor.stack(tensors, axis=0)` static method stacks a list
+  of tensors while keeping them wired into the graph via `StackBackward` —
+  unlike `Tensor(np.stack(...))`, which builds a fresh leaf with no `_grad_fn`.
+  This is what lets the recurrent layers return one output per time step and
+  still backpropagate through time.
 - **Autograd control**: `backward()`, `zero_grad()`, `destroy_graph()`.
 - **Interop**: `numpy()` returns the underlying array.
 
 A convenience path in `__init__` lets you build a batched tensor from a list of
 tensors — `Tensor([t1, t2, ...])` stacks their data automatically.
 
-Note that `core.tensor` imports the backward classes at the *bottom* of the file,
-after `Tensor` is defined, to break the circular import between the tensor
-frontend and the autograd backend (the backward classes need `Tensor` at runtime).
+Note that `thorcino.tensor` imports the backward classes *lazily*, inside the
+method bodies that need them (plus a `TYPE_CHECKING`-only import for the type
+annotations), to break the circular import between the tensor frontend and the
+autograd backend — the backward classes need `Tensor` at runtime.
 
-## Layers (`core/layers.py`)
+## Layers (`thorcino/layers/`)
 
-All layers derive from the abstract `Layer` base class, which defines `forward()`,
-makes instances callable, and exposes a `parameters` property.
+All layers derive from the abstract `Layer` base class, which defines
+`forward()`, `train()` and `eval()`, makes instances callable, and exposes a
+`parameters` property. `train()`/`eval()` flip each layer's `training` flag and
+the `requires_grad` of its parameters.
 
 | Layer        | Description |
 |--------------|-------------|
 | `Linear`     | Fully-connected layer `y = xW + b` with Xavier weight initialization and optional bias. |
 | `Dropout`    | Inverted dropout with keep-probability scaling; a no-op when `training=False`. |
-| `Sequential` | Chains layers and forwards through them in order; aggregates their parameters. |
+| `RNN`        | Vanilla recurrent layer: `H_t = φ_h(X_t·W_xh + H_{t−1}·W_hh + b_h)`, `O_t = φ_o(H_t·W_ho + b_o)`. Unrolls over the sequence axis and returns every step's output stacked along `axis=1`; BPTT falls out of the autograd graph. Takes explicit `activation_h`/`activation_o` layers. |
+| `LSTM`       | Long short-term memory cell with input/forget/output gates and a cell state, unrolled the same way and returning the per-step hidden states. |
+| `Sequential` | Chains layers and forwards through them in order; aggregates their parameters, and propagates `train()`/`eval()`. |
+
+`RNN` is re-exported from `thorcino.layers`; `LSTM` currently has to be imported
+from its module (`from thorcino.layers.lstm import LSTM`).
 
 `Sequential.save_graph(path, arch=True, forward=False, backward=False)` renders a
-`.png` of the model via `core/graph.py` (needs `graphviz`): a cluster per layer
+`.png` of the model via `thorcino/graph.py` (needs `graphviz`): a cluster per layer
 for the architecture, and — if requested — the forward/backward computational
 graphs built from a synthetic input, tensors colour-coded by role
-(input/weights/bias/hidden).
+(input/weights/bias/hidden). `build_graph()` builds and caches the graph without
+rendering it, and `destroy_graph()` drops the cached one.
 
-## Activation functions (`core/activations.py`)
+## Activation functions (`thorcino/activations.py`)
 
-Each activation is available both as a pure NumPy function (`core/functions.py`)
+Each activation is available both as a pure NumPy function (`thorcino/functions.py`)
 and as an autograd-aware `Layer`:
 
 | Activation | Notes |
 |------------|-------|
+| `Identity` | `x` unchanged; useful as an explicit pass-through for the `RNN` layer's activation slots. |
 | `ReLU`     | `max(0, x)` |
 | `Sigmoid`  | Numerically stable (branch on the sign of the input) |
 | `Tanh`     | `np.tanh` |
@@ -200,7 +233,7 @@ and as an autograd-aware `Layer`:
 `functions.py` also provides a stable `log_softmax`, used internally by the
 cross-entropy loss.
 
-## Loss functions (`core/losses.py`)
+## Loss functions (`thorcino/losses.py`)
 
 | Loss                     | Input | Notes |
 |--------------------------|-------|-------|
@@ -208,14 +241,16 @@ cross-entropy loss.
 | `CrossEntropyLoss`       | logits, integer targets | Combines a stable `log_softmax` with negative log-likelihood; the backward is the classic `softmax(logits) − onehot(targets)`. |
 | `BinaryCrossEntropyLoss` | probabilities, targets | Clips predictions to `[1e-7, 1 − 1e-7]` to avoid `log(0)`. |
 
-Each loss is callable (`loss(pred, target)`) and returns a scalar `Tensor` you can
-call `.backward()` on.
+All three derive from the abstract `Loss` base class, which pairs a forward pass
+with the matching `grad_fn`. Each loss is callable (`loss(pred, target)`) and
+returns a scalar `Tensor` you can call `.backward()` on.
 
-## Optimizers (`core/optimizer.py`)
+## Optimizers (`thorcino/optimizer.py`)
 
 | Optimizer | Notes |
 |-----------|-------|
-| `SGD`     | Plain gradient descent with optional L2 weight decay. |
+| `SGD`     | Plain gradient descent with optional L2 weight decay, applied only to tensors tagged `weights`. |
+| `SGD_DL2` | Same, with *independent* `weight_decay` and `bias_decay` terms, so weights and biases can be regularized separately (used by the `regularization/L2` example). |
 | `SGDM`    | SGD with momentum. |
 | `Adam`    | Adaptive moments with bias correction. |
 | `AdamW`   | Adam with decoupled weight decay. |
@@ -224,20 +259,30 @@ Every optimizer takes `model.parameters` and a learning rate; `step()` updates
 `param.data` in place, `zero_grad()` clears `param.grad`, and `get_state()`
 returns the optimizer's hyperparameters/buffers for checkpointing.
 
-## Training loop (`core/training/`)
+## Training loop (`thorcino/training/`)
 
 - **`Trainer`** (`trainer.py`) wraps a model, loss, optimizer and optional
   scheduler. `train_epoch(dataloader, accumulation_steps=1)` runs one epoch
-  (with gradient accumulation and optional `clip_grad_norm` clipping) and
-  `eval(dataloader)` runs a no-grad pass, both logging into `trainer.history`
-  (`train_loss`, `eval_loss`, `lr`). `save()`/`load()` (de)serialize training
-  state to a checkpoint file via `pickle`.
+  (with gradient accumulation and optional gradient clipping, enabled by the
+  `grad_clip_norm` constructor argument) and returns the average per-batch
+  loss; `eval(dataloader)` runs a pass with `requires_grad` switched off and
+  returns `(avg_loss, accuracy)` — accuracy is `0.0` for non-classification
+  (1-D) outputs. Both log into `trainer.history` (`train_loss`, `eval_loss`,
+  `lr`), also reachable via the `train_loss`/`eval_loss` properties.
+  `save()` pickles the full training state to a checkpoint file; `load()`
+  currently restores only `epoch`, `step`, `history` and the training flag —
+  restoring model/optimizer/scheduler state is left out on purpose, to keep
+  the checkpointing code readable.
+- **`clip_grad_norm(parameters, max_norm=1.0)`** rescales every parameter
+  gradient in place so their combined L2 norm stays within `max_norm`, and
+  returns the pre-clip norm. `Trainer` calls it for you, but it is exported
+  from `thorcino.training` for standalone use.
 - **`Schedule`** (`schedulers.py`) is the abstract base for learning-rate
   schedules; `CosineSchedule(max_lr, min_lr, total_epochs)` anneals the
   learning rate from `max_lr` to `min_lr` following a cosine curve, applied by
   `Trainer` at the end of every `train_epoch()` call.
 
-## Data loading (`core/dataset/`)
+## Data loading (`thorcino/dataset/`)
 
 The module mirrors the PyTorch `Dataset` / `DataLoader` pattern.
 
@@ -245,7 +290,8 @@ The module mirrors the PyTorch `Dataset` / `DataLoader` pattern.
 - **`TensorDataset`** — wraps in-memory tensors and validates that they share the
   same length along dimension 0.
 - **`ImageDataset`** — lazily loads images from disk on access (via `load_jpeg`),
-  pairing each with its label.
+  pairing each with its label. Note that `load_jpeg` (`dataset/utils.py`) is
+  still a stub, so this dataset is scaffolding rather than a working loader.
 - **`DataLoader`** — iterates a `Dataset` in mini-batches, with optional
   shuffling, and collates each batch by stacking samples along a new leading
   (batch) axis.
@@ -269,10 +315,22 @@ of end-to-end regression scripts and notebooks built on `Trainer` +
 | [`cubic/`](examples/linear_regression/cubic/cubic.py) | Same idea one degree further: recovers `1.2·x³ − 2.3·x² + 2·x + 2` with a `Linear(3, 1)` layer over `[x, x², x³]`. |
 | [`ill-cond/`](examples/linear_regression/ill-cond/README.md) | Notebook comparing closed-form OLS vs. SGD on ill-conditioned (near-collinear) features, showing OLS's coefficients blow up while SGD's stay stable. |
 | [`variance/`](examples/linear_regression/variance/README.md) | Notebook fitting 20 repeated `Linear(1, 1)` models at each of nine label-noise levels, showing via boxplots how the loss and learned slope/intercept drift and spread as noise grows. |
+| [`regularization/`](examples/linear_regression/regularization/README.md) | Two notebooks on weight decay as variance reduction: [`L2/`](examples/linear_regression/regularization/L2/README.md) sweeps the decay strength (with separate weights/bias decay via `SGD_DL2`) and watches the parameter spread shrink; [`DL2/`](examples/linear_regression/regularization/DL2/README.md) isolates decay from noise across repeated trials (work in progress — only the no-decay baseline is implemented). |
 
 The [`linear_regression/README.md`](examples/linear_regression/README.md)
 ties the linear/quadratic/cubic scripts together and explains why the learning
-rate has to shrink as the polynomial degree grows.
+rate has to shrink as the polynomial degree grows. The notebooks share the
+dataset/training/plotting helpers in
+[`linear_regression/helpers/`](examples/linear_regression/helpers/).
+
+Beyond regression, [`examples/rnn/`](examples/rnn/README.md) is a full
+walkthrough of a recurrent network on a next-number-in-sequence task, in two
+notebooks: `scratch.ipynb` hand-codes the forward recurrence, BPTT and the SGD
+update with raw NumPy, then `main.ipynb` rebuilds the same model on
+`thorcino.layers.RNN` + `Trainer` and renders its architecture and
+forward/backward graphs with `model.save_graph(...)`. Its README derives the
+BPTT gradients in full. [`examples/lstm/`](examples/lstm/) is reserved for the
+same treatment of the `LSTM` layer and is still an empty notebook.
 
 ```bash
 uv run python examples/linear_regression/linear/linear.py
@@ -286,3 +344,11 @@ Planned work is tracked in [`TODO.md`](TODO.md), and includes:
 - **Autograd**: move backward computation entirely onto NumPy arrays (keeping
   `Tensor` as a pure frontend); cache forward intermediates for reuse in backward;
   add a debug step that reports which node a backward failure occurred on.
+
+Known gaps in the current tree: `dataset/utils.py:load_jpeg` is a stub, the
+`LSTM` layer has no example yet, and there is no test suite (the CI pytest step
+is wired up but collects nothing).
+
+## License
+
+[MIT](LICENSE) © cecinuga
