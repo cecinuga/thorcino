@@ -6,18 +6,25 @@ from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 class LSTM(Layer):
+    valid_types = {"n_to_m", "n_to_1"}
+
     def __init__(
         self, 
         in_feature: int, 
         out_feature: int, 
-        hidden_units: int, 
+        hidden_units: int,
+        out_type: str = 'n_to_m',
     ):
+        assert out_type in LSTM.valid_types
+
+        self.type = type
         self.training = True
         self.tanh = Tanh()
         self.sigmoid = Sigmoid()
         self.in_feature = in_feature
         self.out_feature = out_feature
         self.hidden_units = hidden_units
+
 
         scale = np.sqrt(1.0 / in_feature)
 
@@ -97,7 +104,7 @@ class LSTM(Layer):
         Ht = Tensor(np.zeros((batch_size, self.hidden_units)))
         Mt = Tensor(np.zeros((batch_size, self.hidden_units)))
 
-        outs = []
+        outs: list[Tensor] = []
         for t in range(seq_len):
             Hprev, Mprev = Ht, Mt
 
@@ -113,7 +120,10 @@ class LSTM(Layer):
 
             outs.append(Ht)
 
-        return Tensor.stack(outs, axis=1)
+        if self.type == 'n_to_m':
+            return Tensor.stack(outs, axis=1)
+        else:
+            return outs[-1]
     
     @property
     @override

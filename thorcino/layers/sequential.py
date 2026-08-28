@@ -46,11 +46,17 @@ class Sequential(Layer):
         for layer in self.layers:
             layer.eval()
 
-    def build_graph(self, arch: bool = True, forward: bool = False,
+    def build_graph(self, shape: tuple[int, ...], arch: bool = True, forward: bool = False,
                     backward: bool = False) -> None:
         """Build the graph of this model.
 
         Args:
+            shape: real input shape (including the batch dimension) to run
+                the model with, e.g. ``(batch, in_feature)`` for a plain
+                feed-forward model or ``(batch, seq_len, in_feature)`` for a
+                recurrent one. The graph is built from an actual forward/
+                backward pass with this shape, so every node carries the
+                real shape it would have in production.
             arch: include the network architecture (layer info).
             forward: include the forward computational graph (data flow).
             backward: include the backward computational graph (autograd ops).
@@ -58,12 +64,21 @@ class Sequential(Layer):
         # Imported lazily to avoid a circular import (core.graph imports layers).
         from thorcino.graph import ComputationalGraph
         self._graph = ComputationalGraph(self)
-        self._graph.build(arch=arch, forward=forward, backward=backward)
+        self._graph.build(shape, arch=arch, forward=forward, backward=backward)
 
-    def save_graph(self, path: str | Path, arch: bool = True, forward: bool = False,
-                   backward: bool = False) -> None:
-        """Render the graph to a .png image at ``path``."""
-        self.build_graph(arch, forward, backward)
+    def save_graph(self, path: str | Path, shape: tuple[int, ...], arch: bool = True,
+                   forward: bool = False, backward: bool = False) -> None:
+        """Render the graph to a .png image at ``path``.
+
+        Args:
+            path: output .png path.
+            shape: real input shape (including the batch dimension), see
+                :meth:`build_graph`.
+            arch: include the network architecture (layer info).
+            forward: include the forward computational graph (data flow).
+            backward: include the backward computational graph (autograd ops).
+        """
+        self.build_graph(shape, arch, forward, backward)
         assert self._graph is not None
         self._graph.render(path)
 
