@@ -176,8 +176,7 @@ class Tensor:
         return Tensor(np.min(self.data, axis=axis, keepdims=keepdims))
 
     def backward(self, gradient:Tensor|None=None):
-        """Compute gradients via backpropagation"""
-
+        """Compute gradients via backpropagation."""
         if not self.requires_grad:
             return
 
@@ -188,20 +187,43 @@ class Tensor:
             else:
                 raise ValueError("backward() requires gradient for non-scalar")
 
-        if self.grad is None:
-            self.grad = np.zeros_like(self.data)
+        sorted = list(reversed(self.__build_topo()))
+        incoming: dict[int, Tensor] = {id(self): gradient.data}
 
-        self.grad += gradient.data
+        for node in sorted:    
+            grad_in = incoming[id(node)]
+            grads = node._grad_fn.apply(grad_in)
 
-        if self._grad_fn is not None:
-            grads = self._grad_fn.apply(gradient)
+            for child, grad in zip(node._grad_fn.saved_tensors, grads):
+                if id(child) in incoming:
+                    incoming[id(child)] = incoming[id(child)] + grad.data
+                else:
+                    incoming[id(child)] = grad
 
-            for tensor, grad in zip(self._grad_fn.saved_tensors, grads):
-                if tensor.requires_grad:
-                    tensor.backward(grad)
+                if child.grad is None:
+                    child.grad = np.zeros_like(child.data)
+
+                child.grad += grad.data
+
+
+    def __build_topo(self, visited:set | None = None, topo: list | None = None) -> list[Tensor]: 
+        """Reverse-postorder DFS: every node's consumers are garanteed to appear before it."""
+        if visited is None:
+            visited, topo = set(), []
+
+        if id(self) not in visited:
+            visited.add(id(self))
+
+            if self._grad_fn is not None:
+                for tensor in self._grad_fn.saved_tensors:
+                    tensor.__build_topo(visited, topo)
+
+                topo.append(self)
+
+        return topo
 
     @staticmethod
-    def stack(tensors: list["Tensor"], axis: int = 0) -> "Tensor":
+    def stack(tensors: list["Tensor"], axis: int = 0) -> Tensor:
         """Stack a list of tensors along a new axis, keeping them wired into
         the autograd graph (unlike ``Tensor(np.stack(...))``, which builds a
         fresh leaf tensor with no ``_grad_fn``)."""
