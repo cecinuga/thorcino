@@ -183,35 +183,16 @@ class ComputationalGraph:
             fwd.attr(label="Forward Computational Graph", style="rounded",
                      color="#2f855a", fontcolor="#2f855a", fontsize="14")
 
-            out_id = self._tensor_node(fwd, out, "f")
-            self._walk_forward(fwd, out._grad_fn, out_id, set())
-
-    def _walk_forward(self, g: graphviz.Digraph, fn: "Function", result_id: str,
-                      visited: set[int]) -> None:
-        """Recursively add operation and tensor nodes, edges point the way
-        data flows during the forward pass (from the leaves to the output).
-
-        ``visited`` also prunes the recursion, not just node (re)creation:
-        without it, any tensor consumed by more than one downstream op (e.g.
-        the hidden/cell state shared by every gate in an RNN/LSTM timestep)
-        would have its whole upstream subgraph re-walked once per consumer,
-        compounding into an exponential blow-up across timesteps."""
-        fn_id = f"ff{id(fn)}"
-        first_visit = id(fn) not in visited
-        if first_visit:
-            visited.add(id(fn))
-            g.node(fn_id, self._op_forward_name(fn), **_STYLE["op"])
-        # The operation produces its result -> data flows op -> result.
-        g.edge(fn_id, result_id)
-
-        if not first_visit:
-            return  # already expanded this op's subgraph, don't redo the work
-
-        for t in fn.saved_tensors:
-            t_id = self._tensor_node(g, t, "f")
-            g.edge(t_id, fn_id)  # input tensor feeds the operation
-            if t._grad_fn is not None:
-                self._walk_forward(g, t._grad_fn, t_id, visited)
+            self._tensor_node(fwd, out, "f")
+            for t in self._topo_order(out):
+                fn = t._grad_fn
+                assert fn is not None  # _topo_order only yields produced tensors
+                fn_id = f"ff{id(fn)}"
+                fwd.node(fn_id, self._op_forward_name(fn), **_STYLE["op"])
+                # The operation produces its result -> data flows op -> result.
+                fwd.edge(fn_id, self._tensor_node(fwd, t, "f"))
+                for s in fn.saved_tensors:
+                    fwd.edge(self._tensor_node(fwd, s, "f"), fn_id)  # input tensor feeds the operation
 
     @staticmethod
     def _op_forward_name(fn: "Function") -> str:
@@ -229,34 +210,50 @@ class ComputationalGraph:
             bwd.attr(label="Backward Computational Graph", style="rounded",
                      color="#c05621", fontcolor="#c05621", fontsize="14")
 
-            out_id = self._tensor_node(bwd, out, "t")
-            self._walk(bwd, out._grad_fn, out_id, set())
+            self._tensor_node(bwd, out, "t")
+            for t in self._topo_order(out):
+                fn = t._grad_fn
+                assert fn is not None  # _topo_order only yields produced tensors
+                fn_id = f"fn{id(fn)}"
+                bwd.node(fn_id, type(fn).__name__, **_STYLE["op"])
+                # Gradients flow the way they propagate -> from the result back to the op.
+                bwd.edge(self._tensor_node(bwd, t, "t"), fn_id, label="grad")
+                for s in fn.saved_tensors:
+                    bwd.edge(fn_id, self._tensor_node(bwd, s, "t"))
 
-    def _walk(self, g: graphviz.Digraph, fn: "Function", child_id: str,
-              visited: set[int]) -> None:
-        """Recursively add operation and tensor nodes, edges point the way
-        gradients propagate (from the output back towards the leaves).
+    @staticmethod
+    def _topo_order(root: Tensor) -> list[Tensor]:
+        """Iterative post-order DFS over the autograd graph rooted at ``root``,
+        yielding every tensor produced by an operation (i.e. with a
+        ``_grad_fn``) exactly once, each after every tensor it (transitively)
+        depends on - mirroring ``Tensor.__build_topo``.
 
-        ``visited`` also prunes the recursion, not just node (re)creation:
-        without it, any tensor consumed by more than one downstream op (e.g.
-        the hidden/cell state shared by every gate in an RNN/LSTM timestep)
-        would have its whole upstream subgraph re-walked once per consumer,
-        compounding into an exponential blow-up across timesteps."""
-        fn_id = f"fn{id(fn)}"
-        first_visit = id(fn) not in visited
-        if first_visit:
-            visited.add(id(fn))
-            g.node(fn_id, type(fn).__name__, **_STYLE["op"])
-        g.edge(child_id, fn_id, label="grad")
-
-        if not first_visit:
-            return  # already expanded this op's subgraph, don't redo the work
-
-        for t in fn.saved_tensors:
-            t_id = self._tensor_node(g, t, "t")
-            g.edge(fn_id, t_id)
-            if t._grad_fn is not None:
-                self._walk(g, t._grad_fn, t_id, visited)
+        A tensor consumed by more than one downstream op (e.g. the
+        hidden/cell state shared by every gate in an RNN/LSTM timestep) is
+        marked "discovered" the moment it's first reached, so it is never
+        re-queued for expansion by a later consumer; without that guard the
+        whole upstream subgraph would be re-walked once per consumer,
+        compounding into an exponential blow-up across timesteps. The DFS
+        itself uses an explicit stack rather than function-call recursion,
+        so it also doesn't blow Python's recursion limit on the long chains
+        a many-timestep RNN/LSTM produces - the same failure mode the old
+        recursive ``backward()`` had before it moved to a topo-sorted pass."""
+        discovered: set[int] = {id(root)}
+        order: list[Tensor] = []
+        stack: list[tuple[Tensor, bool]] = [(root, False)]
+        while stack:
+            node, expanded = stack.pop()
+            if expanded:
+                if node._grad_fn is not None:
+                    order.append(node)
+                continue
+            stack.append((node, True))
+            if node._grad_fn is not None:
+                for child in node._grad_fn.saved_tensors:
+                    if id(child) not in discovered:
+                        discovered.add(id(child))
+                        stack.append((child, False))
+        return order
 
     def _tensor_node(self, g: graphviz.Digraph, t: Tensor, prefix: str) -> str:
         """Add (once) a tensor node labelled and coloured by its role."""
