@@ -5,7 +5,7 @@ from thorcino.losses import MSELoss
 from thorcino.optimizer import SGD
 from thorcino.training.schedulers import CosineSchedule
 from thorcino.training.trainer import Trainer
-from examples.linear_regression.helpers.dataset import preprocess_dataloader
+from examples.helpers.dataset import preprocess_dataloader
 
 
 def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: float, epochs: int, weights_decay:float = 0) -> Trainer:
