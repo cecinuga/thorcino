@@ -9,35 +9,35 @@ class RNN(Layer):
     def __init__(
         self, 
         in_feature: int,
-        out_feature: int,
+        #out_feature: int,
         hidden_units: int,
         activation_h: Layer,
-        activation_o: Layer,
+        #activation_o: Layer,
         bias_hidden: bool = True,
-        bias_out: bool = True,
+        #bias_out: bool = True,
     ):
         self.training = True
         self.in_feature = in_feature
-        self.out_feature = out_feature
+        #self.out_feature = out_feature
         self.hidden_units = hidden_units
         self.activation_h = activation_h
-        self.activation_o = activation_o
+        #self.activation_o = activation_o
 
         scale = np.sqrt(1.0 / in_feature)
         weights_data = np.random.randn(in_feature, hidden_units) * scale
         self.weights_input = Tensor(weights_data, role=WEIGHTS_ROLE)
 
-        scale = np.sqrt(1.0 / hidden_units)
+        """scale = np.sqrt(1.0 / hidden_units)
         weights_data = np.random.randn(hidden_units, out_feature) * scale
-        self.weights_output = Tensor(weights_data, role=WEIGHTS_ROLE)
+        self.weights_output = Tensor(weights_data, role=WEIGHTS_ROLE)"""
 
         weights_data = np.random.randn(hidden_units, hidden_units) * scale
         self.weighs_hidden = Tensor(weights_data, role=WEIGHTS_ROLE)
         
-        if bias_out:
+        """if bias_out:
             self.bias_out = Tensor(np.zeros(out_feature), role=BIAS_ROLE)
         else:
-            self.bias_out = None
+            self.bias_out = None"""
 
         if bias_hidden:
             self.bias_hidden = Tensor(np.zeros(hidden_units), role=BIAS_ROLE)
@@ -46,7 +46,8 @@ class RNN(Layer):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden}, bias_out={self.bias_out})"
+        #return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden}, bias_out={self.bias_out})"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden}))"
 
     @override
     def forward(self, X: Tensor) -> Tensor:
@@ -84,25 +85,27 @@ class RNN(Layer):
                 Ht += self.bias_hidden
             Ht = self.activation_h(Ht)
 
-            out = Ht @ self.weights_output
+            """out = Ht @ self.weights_output
             if self.bias_out is not None:
                 out += self.bias_out
             out = self.activation_o(out)
 
-            outs.append(out)
+            outs.append(out)"""
+            outs.append(Ht)
 
         return Tensor.stack(outs, axis=1)
     
     @property
     @override
     def parameters(self) -> list[Tensor]:
-        params = [self.weights_input, self.weighs_hidden, self.weights_output]
+        #params = [self.weights_input, self.weighs_hidden, self.weights_output]
+        params = [self.weights_input, self.weighs_hidden]
 
         if self.bias_hidden is not None:
             params.append(self.bias_hidden)
         
-        if self.bias_out is not None:
-            params.append(self.bias_out)
+        """if self.bias_out is not None:
+            params.append(self.bias_out)"""
 
         return params
 
@@ -112,13 +115,13 @@ class RNN(Layer):
 
         self.weights_input.requires_grad = True
         self.weighs_hidden.requires_grad = True
-        self.weights_output.requires_grad = True
+        #self.weights_output.requires_grad = True
 
         if self.bias_hidden is not None:
             self.bias_hidden.requires_grad = True
         
-        if self.bias_out is not None:
-            self.bias_out.requires_grad = True
+        """if self.bias_out is not None:
+            self.bias_out.requires_grad = True"""
 
     @override
     def eval(self) -> None:
@@ -126,10 +129,10 @@ class RNN(Layer):
 
         self.weights_input.requires_grad = False
         self.weighs_hidden.requires_grad = False
-        self.weights_output.requires_grad = False
+        #self.weights_output.requires_grad = False
 
         if self.bias_hidden is not None:
             self.bias_hidden.requires_grad = False
         
-        if self.bias_out is not None:
-            self.bias_out.requires_grad = False
+        """if self.bias_out is not None:
+            self.bias_out.requires_grad = False"""
