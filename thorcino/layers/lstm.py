@@ -11,7 +11,6 @@ class LSTM(Layer):
     def __init__(
         self, 
         in_feature: int, 
-        out_feature: int, 
         hidden_units: int,
         out_type: str = 'n_to_m',
     ):
@@ -22,9 +21,7 @@ class LSTM(Layer):
         self.tanh = Tanh()
         self.sigmoid = Sigmoid()
         self.in_feature = in_feature
-        self.out_feature = out_feature
         self.hidden_units = hidden_units
-
 
         scale = np.sqrt(1.0 / in_feature)
 
@@ -62,7 +59,7 @@ class LSTM(Layer):
     
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, hidden_units={self.hidden_units})"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, hidden_units={self.hidden_units})"
     
     def __compute_gate_input(self, Xt: Tensor, Ht: Tensor) -> Tensor:
         L = Xt @ self.weights_input + Ht @ self.weights_h_input + self.bias_input
