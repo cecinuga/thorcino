@@ -188,22 +188,17 @@ class Tensor:
             else:
                 raise ValueError("backward() requires gradient for non-scalar")
 
-        visited = {}
-        self.__backward(gradient, visited)
-
-    def __backward(self, gradient: Tensor, visited: dict):
         if self.grad is None:
             self.grad = np.zeros_like(self.data)
         
         self.grad += gradient.data
-
+\
         if self._grad_fn is not None:
             grads = self._grad_fn.apply(gradient)
 
             for tensor, grad in zip(self._grad_fn.saved_tensors, grads):
-                if tensor.requires_grad and tensor not in visited:
-                    visited[tensor] = 1
-                    tensor.__backward(grad, visited)
+                if tensor.requires_grad :
+                    tensor.backward(grad)
 
 
     @staticmethod
