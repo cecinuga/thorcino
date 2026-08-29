@@ -46,7 +46,7 @@ class Sequential(Layer):
         for layer in self.layers:
             layer.eval()
 
-    def build_graph(self, shape: tuple[int, ...], arch: bool = True, forward: bool = False,
+    def __build_graph(self, shape: tuple[int, ...], arch: bool = True, forward: bool = False,
                     backward: bool = False) -> None:
         """Build the graph of this model.
 
@@ -66,7 +66,7 @@ class Sequential(Layer):
         self._graph = ComputationalGraph(self)
         self._graph.build(shape, arch=arch, forward=forward, backward=backward)
 
-    def save_graph(self, path: str | Path, shape: tuple[int, ...], arch: bool = True,
+    def __save_graph(self, path: str | Path, shape: tuple[int, ...], arch: bool = True,
                    forward: bool = False, backward: bool = False) -> None:
         """Render the graph to a .png image at ``path``.
 
@@ -78,9 +78,19 @@ class Sequential(Layer):
             forward: include the forward computational graph (data flow).
             backward: include the backward computational graph (autograd ops).
         """
-        self.build_graph(shape, arch, forward, backward)
+        self.__build_graph(shape, arch, forward, backward)
         assert self._graph is not None
         self._graph.render(path)
+
+
+    def save_arch(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        self.__save_graph(path, shape)
+
+    def save_forward(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        self.__save_graph(path, shape, arch=False, forward=True)
+
+    def save_backward(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        self.__save_graph(path, shape, arch=False, backward=True)
 
     def destroy_graph(self) -> None:
         self._graph = None
