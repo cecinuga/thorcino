@@ -118,6 +118,10 @@ The plot above shows the training loss (summed MSE over the sequence) across the
 
 The thorcino version trains the same task through the framework's `Trainer`: each epoch calls `trainer.train_epoch(loader_tr)` over batches from a `DataLoader`/`TensorDataset` pair, with periodic `trainer.eval(loader_te)` calls on a held-out test set. The model is a single `RNN` layer (`d=1` input feature, `h=2` hidden units, `o=1` output feature, `Identity` activations) inside a `Sequential`, trained for 50 epochs with `SGD` (`MAX_LR=1e-5`, `MIN_LR=1e-8`, momentum `0.7`) under a `CosineSchedule`, on `N=1000` random sequences of length `T=5` (`min_start=30` for training, `min_start=45` for testing). Before training, `model.save_graph(...)` dumps the model's static architecture and the forward/backward computation graphs to [images/arch.png](./images/arch.png), [images/forward.png](./images/forward.png) and [images/backward.png](./images/backward.png).
 
+<p align="center"><img src="./images/arch.png" alt="Model architecture graph"></p>
+
+The graph above shows the static architecture rendered by `model.save_graph(...)`: the `Sequential` model wraps the `RNN` layer (`in_feature=1`, `hidden_units=2`) feeding into a `Linear` layer (`in_feature=2`, `out_feature=1`), with the input/output tensor shapes `(1000, 5, 1)` for the `N=1000`, `T=5` sequence data used in the notebook.
+
 At inference time (`model.eval()` + a forward call), the notebook prints per-time-step comparison tables (expected vs. predicted vs. % error) for a test sequence and a training sequence, showing errors in roughly the 2–13% range across the 5 steps — the prediction error grows with `t` since each step's hidden state compounds the approximation error of the previous one.
 
 ---
