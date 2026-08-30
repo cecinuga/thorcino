@@ -16,7 +16,7 @@ class LSTM(Layer):
     ):
         assert out_type in LSTM.valid_types
 
-        self.type = type
+        self.out_type = out_type
         self.training = True
         self.tanh = Tanh()
         self.sigmoid = Sigmoid()
@@ -105,8 +105,8 @@ class LSTM(Layer):
         for t in range(seq_len):
             Hprev, Mprev = Ht, Mt
 
-            Xt = Tensor(X.data[:, t].reshape(-1, self.in_feature))
-
+            Xt = Tensor(X.data[:, t])
+            
             It = self.__compute_gate_input(Xt, Hprev)
             Ft = self.__compute_gate_forget(Xt, Hprev)
             Ot = self.__compute_gate_output(Xt, Hprev)
@@ -117,7 +117,7 @@ class LSTM(Layer):
 
             outs.append(Ht)
 
-        if self.type == 'n_to_m':
+        if self.out_type == 'n_to_m':
             return Tensor.stack(outs, axis=1)
         else:
             return outs[-1]

@@ -47,7 +47,7 @@ class Trainer:
         self.step: int = 0
         self.epoch: int = 0
         self.training: bool = True
-        self.history:dict[str, list[float]] = {'train_loss': [], 'eval_loss': [], 'lr': []}
+        self.history:dict[str, list[float]] = {'train_loss': [], 'eval_loss': [], 'accuracy': [], 'lr': []}
 
     def _accumulate(self, total_loss: float, accumulated_loss: float, num_batches: int):
         if self.grad_clip_norm is not None:
@@ -120,7 +120,7 @@ class Trainer:
             total_loss += float(loss.data)
 
             # Calculate accuracy (for classification)
-            if len(preds.shape) > 1: # Multi class
+            if len(preds.shape) > 1 and preds.shape[1] > 1: # Multi class
                 predictions = np.argmax(preds.data, axis=1)
                 if len(targets.shape) == 1: # Integer targets
                     correct += np.sum(predictions == targets.data)
@@ -128,11 +128,17 @@ class Trainer:
                     correct += np.sum(predictions == np.argmax(targets.data, axis=1))
                 total += len(predictions)
 
+            elif len(preds.shape) > 1 and preds.shape[1] == 1: # Binary class
+                predictions = np.round(preds.data.flatten())
+                correct += np.sum(predictions == targets.data)
+                total += len(predictions)
+
         avg_loss = total_loss / len(dataloader) if len(dataloader) > 0 else 0
         accuracy = correct / total if total > 0 else 0
 
         self.model.train()
         self.training = True
+        self.history['accuracy'].append(accuracy)
         self.history['eval_loss'].append(avg_loss)
         return avg_loss, accuracy
 

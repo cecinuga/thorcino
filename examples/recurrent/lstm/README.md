@@ -52,7 +52,7 @@ Optimizer = SGD
 
 ## Training Hyperparameters
 - EPOCHS = 100
-- Sequence Length = 20
+- Sequence Character Length = 40
 - Batch Size = 16
 - Learning Rate = 1e-1, 1e-4 (Cosine scheduler applied)
 

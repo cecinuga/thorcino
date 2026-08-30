@@ -28,7 +28,7 @@ class Linear(Layer):
     @override
     def forward(self, x: Tensor) -> Tensor:
         """Compute the layer output: `y = xW + b`"""
-        output = x.matmul(self.weights)
+        output = x @ self.weights
 
         if self.bias is not None:
             output = output + self.bias
