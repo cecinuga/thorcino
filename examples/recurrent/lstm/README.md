@@ -58,6 +58,11 @@ Optimizer = SGD
 
 
 ## Metrics
+TRAIN LOSS IMPROVED BY *90.45%*
+
+TEST LOSS IMPROVED BY *90.503%*
+
+CORRECTS PREDICTION ON TEST SET ARE: *100.0%*
 <p align="center">
     <img src="./images/metrics.png"/>
 </p>
