@@ -5,12 +5,10 @@ from thorcino.tensor import Tensor
 
 
 def diff_percentage(min: float, max: float) -> float:
-    assert max >= min
     diff = max - min
     return diff / max * 100
 
 def percentage(min: float, max: float) -> float:
-    assert max >= min
     return min / max * 100
 
 def accuracy(model: Sequential, X: Tensor, Y: Tensor) -> float:
