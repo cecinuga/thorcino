@@ -83,5 +83,10 @@ def parse_vect(input: np.ndarray) -> bool:
             prev = ''
         else:
             return False
-            
+
+    # a sequence that ends on a dangling opener (A/E/O with no matching
+    # closer) is an incomplete term, not a valid one
+    if prev in ('A', 'E', 'O'):
+        return False
+
     return True
