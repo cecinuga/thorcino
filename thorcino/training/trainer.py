@@ -129,7 +129,7 @@ class Trainer:
                 total += len(predictions)
 
             elif len(preds.shape) > 1 and preds.shape[1] == 1: # Binary class
-                predictions = np.round(preds.data.flatten())
+                predictions = np.round(preds.data)
                 correct += np.sum(predictions == targets.data)
                 total += len(predictions)
 
