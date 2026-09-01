@@ -3,6 +3,7 @@ from typing import Any
 import numpy as np
 from sklearn.datasets import make_regression, make_low_rank_matrix
 
+from examples.recurrent.helpers import generate_invalid_seqs, generate_valid_seqs, parse_vect, tokenize
 from thorcino.dataset.dataset import DataLoader, TensorDataset
 from thorcino.tensor import Tensor
 
@@ -31,6 +32,33 @@ def split_dataset(X:np.ndarray, split_ratio:float = 0.9, axis:int=0) -> tuple[np
     X0, X1 = X[tuple(slicer0)], X[tuple(slicer1)]
 
     return X0, X1
+
+def get_dataset(row: int, col: int) -> tuple[np.array, np.array]:
+    X_valid = np.array(tokenize(generate_valid_seqs(row, col)))
+    X_invalid = np.array(tokenize(generate_invalid_seqs(row, col*2)))
+    X = np.append(X_valid, X_invalid, axis=0)
+    np.random.shuffle(X)
+
+    Y = np.array([np.array([parse_vect(seq)], dtype=np.float32) for seq in X])
+
+    return X, Y
+
+def split_dataset(X: np.ndarray, Y: np.ndarray, split_ratio: float) -> tuple[np.array, np.array, np.array, np.array]:
+    assert X.shape[0] == Y.shape[0]
+
+    train_len = int(split_ratio*X.shape[0])
+
+    X_train, X_test = X[:train_len], X[train_len:]
+    Y_train, Y_test = Y[:train_len], Y[train_len:]
+
+    return X_train, Y_train, X_test, Y_test
+
+def preprocess(X: np.ndarray, Y: np.ndarray, batch_size: int, split_ratio: float) -> tuple[DataLoader, DataLoader]:
+    X_train, Y_train, X_test, Y_test = split_dataset(X, Y, split_ratio)
+    train_dataset, test_dataset = TensorDataset(Tensor(X_train), Tensor(Y_train)), TensorDataset(Tensor(X_test), Tensor(Y_test))
+    train_dataloader, test_dataloader = DataLoader(train_dataset, batch_size, True), DataLoader(test_dataset, batch_size, True)
+
+    return train_dataloader, test_dataloader
 
 def generate_noise_dataset(f: Any, size: int, sample_size: int, noise: float, min: float, max: float, seed: float) -> np.ndarray:
     rng = np.random.default_rng(seed)
