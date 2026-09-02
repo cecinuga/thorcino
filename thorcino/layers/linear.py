@@ -59,3 +59,12 @@ class Linear(Layer):
             params.append(self.bias)
 
         return params
+
+    @property
+    @override
+    def state(self) -> dict:
+        data = { 'W': self.weights, }
+        if self.bias is not None:
+            data['b'] = self.bias
+
+        return data

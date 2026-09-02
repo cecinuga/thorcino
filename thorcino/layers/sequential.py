@@ -33,6 +33,13 @@ class Sequential(Layer):
         for layer in self.layers:
             params.extend(layer.parameters)
         return params
+    
+    @property
+    @override
+    def state(self) -> dict:
+        state = {}
+        for layer in self.layers:
+            state[layer.__repr__()] = layer.state
 
     @override
     def train(self) -> None:

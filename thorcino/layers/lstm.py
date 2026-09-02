@@ -132,6 +132,17 @@ class LSTM(Layer):
         ]
 
         return params
+    
+    @property
+    @override
+    def parameters(self) -> dict:
+        data = {
+            'W_i': self.weights_input, 'W_f': self.weights_forget, 'W_c': self.weights_cell,
+            'W_hi': self.weights_h_input, 'W_hf': self.weights_h_forget, 'W_fc': self.weights_h_cell,
+            'b_i': self.bias_input, 'b_f': self.bias_forget, 'b_c': self.bias_cell, 'b_o': self.bias_output
+        }
+
+        return data
 
     @override
     def train(self) -> None:

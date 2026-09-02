@@ -16,7 +16,8 @@ class Optimizer:
     def step(self) -> None:
         raise NotImplementedError()
 
-    def get_state(self) -> Any:
+    @property
+    def state(self) -> Any:
         raise NotImplementedError()
 
 class SGD(Optimizer):
@@ -38,7 +39,8 @@ class SGD(Optimizer):
             param.data -= self.lr * grad_data
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
     
 class SGD_DL2(Optimizer):
@@ -65,7 +67,8 @@ class SGD_DL2(Optimizer):
             param.data -= self.lr * grad_data
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
 
 class SGDM(Optimizer):
@@ -100,7 +103,8 @@ class SGDM(Optimizer):
         return self.momentum > 0
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return {'lr': self.lr, 'weight_decay': self.weight_decay, 'momentum': self.momentum, 'momentum_buffer': self.momentum_buffer}
 
 
@@ -138,15 +142,16 @@ class Adam(Optimizer):
             # 3. Update parameter (Adaptive step)
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
 
-        @override
-        def get_state(self):
-            return {
-                'lr': self.lr,
-                'eps': self.eps,
-                'betas': (self.beta1, self.beta2),
-                'm_buffers': self.m_buffers,
-                'v_buffers': self.v_buffers
-            }
+    @override
+    @property
+    def state(self):
+        return {
+            'lr': self.lr,
+            'eps': self.eps,
+            'betas': (self.beta1, self.beta2),
+            'm_buffers': self.m_buffers,
+            'v_buffers': self.v_buffers
+        }
 
 
 class AdamW(Optimizer):
@@ -190,7 +195,8 @@ class AdamW(Optimizer):
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
 
         @override
-        def get_state(self):
+        @property
+        def state(self):
             return {
                 'lr': self.lr,
                 'eps': self.eps,

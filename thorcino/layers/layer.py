@@ -12,6 +12,10 @@ class Layer(ABC):
     def __call__(self, x: Tensor) -> Tensor:
         return self.forward(x)
 
+    @override
+    def __repr__(self) -> str:
+        return f"{type(self).__name__}()"
+
     @abstractmethod
     def train(self) -> None:
         pass
@@ -23,7 +27,8 @@ class Layer(ABC):
     @property
     def parameters(self) -> list[Tensor]:
         return []
-
-    @override
-    def __repr__(self) -> str:
-        return f"{type(self).__name__}()"
+    
+    @property
+    def state(self) -> dict:
+        """Return the weights and bias of the layer"""
+        return {self.__repr__(): {}}

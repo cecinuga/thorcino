@@ -41,8 +41,6 @@ class RNN(Layer):
 
         `H_t = phi_h(Xt @ W_xh + H_{t-1} @ W_hh + b_h)`
         
-        `O_t = phi_o(H_t @ W_ho + b_o)`
-
         Params
         ------
         X: inputs, possible shapes: 
@@ -83,6 +81,15 @@ class RNN(Layer):
             params.append(self.bias_hidden)
         
         return params
+    
+    @property
+    @override
+    def state(self) -> dict:
+        data = { 'W_xh': self.weights_input,  'W_hh': self.weighs_hidden }
+        if self.bias_hidden is not None:
+            data['b_h'] = self.bias_hidden
+
+        return data
 
     @override
     def train(self) -> None:
