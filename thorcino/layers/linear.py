@@ -68,3 +68,9 @@ class Linear(Layer):
             data['b'] = self.bias
 
         return data
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.W = state['W']
+        if self.bias is not None:
+            self.bias = state['b']

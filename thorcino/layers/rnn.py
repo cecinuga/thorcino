@@ -90,6 +90,13 @@ class RNN(Layer):
             data['b_h'] = self.bias_hidden
 
         return data
+    
+    @override
+    def set_state(self, state) -> None:
+        self.weights_input = state['W_xh']
+        self.weighs_hidden = state['W_hh']
+        if self.bias_hidden is not None:
+            self.bias_hidden = state['b_h']
 
     @override
     def train(self) -> None:

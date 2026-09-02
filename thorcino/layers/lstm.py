@@ -135,14 +135,29 @@ class LSTM(Layer):
     
     @property
     @override
-    def parameters(self) -> dict:
+    def state(self) -> dict:
         data = {
-            'W_i': self.weights_input, 'W_f': self.weights_forget, 'W_c': self.weights_cell,
-            'W_hi': self.weights_h_input, 'W_hf': self.weights_h_forget, 'W_fc': self.weights_h_cell,
+            'W_i': self.weights_input, 'W_f': self.weights_forget, 'W_c': self.weights_cell, 'W_o': self.weights_output,
+            'W_hi': self.weights_h_input, 'W_hf': self.weights_h_forget, 'W_hc': self.weights_h_cell, 'W_ho': self.weights_h_output,
             'b_i': self.bias_input, 'b_f': self.bias_forget, 'b_c': self.bias_cell, 'b_o': self.bias_output
         }
 
         return data
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.weights_input = state['W_i']
+        self.weights_forget = state['W_f']
+        self.weights_cell = state['W_c']
+        self.weights_output = state['W_o']
+        self.weights_h_input = state['W_hi']
+        self.weights_h_forget = state['W_hf']
+        self.weights_h_cell = state['W_hc']
+        self.weights_h_output = state['W_ho']
+        self.bias_input = state['b_i']
+        self.bias_forget = state['b_f']
+        self.bias_cell = state['b_c']
+        self.bias_output = state['b_o']
 
     @override
     def train(self) -> None:
