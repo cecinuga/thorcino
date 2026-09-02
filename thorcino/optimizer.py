@@ -194,14 +194,14 @@ class AdamW(Optimizer):
             # Apply gradient-based update
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
 
-        @override
-        @property
-        def state(self):
-            return {
-                'lr': self.lr,
-                'eps': self.eps,
-                'betas': (self.beta1, self.beta2),
-                'weight_decay': self.weight_decay,
-                'm_buffers': self.m_buffers,
-                'v_buffers': self.v_buffers
-            }
+    @override
+    @property
+    def state(self):
+        return {
+            'lr': self.lr,
+            'eps': self.eps,
+            'betas': (self.beta1, self.beta2),
+            'weight_decay': self.weight_decay,
+            'm_buffers': self.m_buffers,
+            'v_buffers': self.v_buffers
+        }
