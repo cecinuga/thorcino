@@ -32,7 +32,7 @@ class RNN(Layer):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden}))"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, hidden_units={self.hidden_units}, bias_hidden={self.bias_hidden.shape}))"
 
     @override
     def forward(self, X: Tensor) -> Tensor:

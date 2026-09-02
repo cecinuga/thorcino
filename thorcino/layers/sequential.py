@@ -39,17 +39,16 @@ class Sequential(Layer):
     def state(self) -> dict:
         state = {}
         for layer in self.layers:
-            state[layer] = layer.state
+            state[layer.__repr__()] = layer.state
 
         return state
 
     @override
-    def set_state(self, states: dict) -> dict:
+    def set_state(self, states: dict) -> None:
         assert len(self.layers) == len(states.keys())
 
-        print(states)
         for layer in self.layers:
-            state = states[layer]
+            state = states[layer.__repr__()]
             layer.set_state(state)
 
     @override

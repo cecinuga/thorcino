@@ -23,7 +23,7 @@ class Linear(Layer):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, bias={self.bias})"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, bias={self.bias.shape})"
 
     @override
     def forward(self, x: Tensor) -> Tensor:
