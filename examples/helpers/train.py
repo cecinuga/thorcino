@@ -24,9 +24,9 @@ def create_trainer(in_feature: int, out_feature:int, min_lr: float, max_lr: floa
 def get_model_param(model: Sequential) -> np.ndarray:
     """Return the model parameters"""
 
-    param = model.parameters
-    weights, bias = param
-    bias = bias.reshape(-1, 1)
+    weights, bias = model.parameters
+    weights = np.asarray(weights.data)
+    bias = np.asarray(bias.data).reshape(-1, 1)
 
     param = np.array([weights, bias], dtype=object)
     return param

@@ -43,7 +43,7 @@ def get_dataset(row: int, col: int) -> tuple[np.array, np.array]:
 
     return X, Y
 
-def split_dataset(X: np.ndarray, Y: np.ndarray, split_ratio: float) -> tuple[np.array, np.array, np.array, np.array]:
+def split_xy_dataset(X: np.ndarray, Y: np.ndarray, split_ratio: float) -> tuple[np.array, np.array, np.array, np.array]:
     assert X.shape[0] == Y.shape[0]
 
     train_len = int(split_ratio*X.shape[0])
@@ -54,7 +54,7 @@ def split_dataset(X: np.ndarray, Y: np.ndarray, split_ratio: float) -> tuple[np.
     return X_train, Y_train, X_test, Y_test
 
 def preprocess(X: np.ndarray, Y: np.ndarray, batch_size: int, split_ratio: float) -> tuple[DataLoader, DataLoader]:
-    X_train, Y_train, X_test, Y_test = split_dataset(X, Y, split_ratio)
+    X_train, Y_train, X_test, Y_test = split_xy_dataset(X, Y, split_ratio)
     train_dataset, test_dataset = TensorDataset(Tensor(X_train), Tensor(Y_train)), TensorDataset(Tensor(X_test), Tensor(Y_test))
     train_dataloader, test_dataloader = DataLoader(train_dataset, batch_size, True), DataLoader(test_dataset, batch_size, True)
 
