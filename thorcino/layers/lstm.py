@@ -137,27 +137,27 @@ class LSTM(Layer):
     @override
     def state(self) -> dict:
         data = {
-            'W_i': self.weights_input.data, 'W_f': self.weights_forget.data, 'W_c': self.weights_cell.data, 'W_o': self.weights_output.data,
-            'W_hi': self.weights_h_input.data, 'W_hf': self.weights_h_forget.data, 'W_hc': self.weights_h_cell.data, 'W_ho': self.weights_h_output.data,
-            'b_i': self.bias_input.data, 'b_f': self.bias_forget.data, 'b_c': self.bias_cell.data, 'b_o': self.bias_output.data
+            'W_i': self.weights_input.data.copy(), 'W_f': self.weights_forget.data.copy(), 'W_c': self.weights_cell.data.copy(), 'W_o': self.weights_output.data.copy(),
+            'W_hi': self.weights_h_input.data.copy(), 'W_hf': self.weights_h_forget.data.copy(), 'W_hc': self.weights_h_cell.data.copy(), 'W_ho': self.weights_h_output.data.copy(),
+            'b_i': self.bias_input.data.copy(), 'b_f': self.bias_forget.data.copy(), 'b_c': self.bias_cell.data.copy(), 'b_o': self.bias_output.data.copy()
         }
 
         return data
     
     @override
     def set_state(self, state: dict) -> None:
-        self.weights_input.data = state['W_i']
-        self.weights_forget.data = state['W_f']
-        self.weights_cell.data = state['W_c']
-        self.weights_output.data = state['W_o']
-        self.weights_h_input.data = state['W_hi']
-        self.weights_h_forget.data = state['W_hf']
-        self.weights_h_cell.data = state['W_hc']
-        self.weights_h_output.data = state['W_ho']
-        self.bias_input.data = state['b_i']
-        self.bias_forget.data = state['b_f']
-        self.bias_cell.data = state['b_c']
-        self.bias_output.data = state['b_o']
+        self.weights_input.data = state['W_i'].copy()
+        self.weights_forget.data = state['W_f'].copy()
+        self.weights_cell.data = state['W_c'].copy()
+        self.weights_output.data = state['W_o'].copy()
+        self.weights_h_input.data = state['W_hi'].copy()
+        self.weights_h_forget.data = state['W_hf'].copy()
+        self.weights_h_cell.data = state['W_hc'].copy()
+        self.weights_h_output.data = state['W_ho'].copy()
+        self.bias_input.data = state['b_i'].copy()
+        self.bias_forget.data = state['b_f'].copy()
+        self.bias_cell.data = state['b_c'].copy()
+        self.bias_output.data = state['b_o'].copy()
 
     @override
     def train(self) -> None:

@@ -23,7 +23,9 @@ class Linear(Layer):
 
     @override
     def __repr__(self) -> str:
-        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, bias={self.bias.shape})"
+        if self.bias is not None:
+            return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature}, bias={self.bias.shape})"
+        return f"{type(self).__name__}(in_feature={self.in_feature}, out_feature={self.out_feature})"
 
     @override
     def forward(self, x: Tensor) -> Tensor:
@@ -63,14 +65,14 @@ class Linear(Layer):
     @property
     @override
     def state(self) -> dict:
-        data = { 'W': self.weights.data, }
+        data = { 'W': self.weights.data.copy(), }
         if self.bias is not None:
-            data['b'] = self.bias.data
+            data['b'] = self.bias.data.copy()
 
         return data
     
     @override
     def set_state(self, state: dict) -> None:
-        self.weights.data = state['W']
+        self.weights.data = state['W'].copy()
         if self.bias is not None:
-            self.bias.data = state['b']
+            self.bias.data = state['b'].copy()

@@ -31,7 +31,7 @@ class Layer(ABC):
     @property
     def state(self) -> dict:
         """Return the weights and bias of the layer"""
-        return {self.__repr__(): {}}
+        return {}
     
     @override
     def set_state(self, state: dict) -> None:

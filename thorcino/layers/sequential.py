@@ -38,8 +38,8 @@ class Sequential(Layer):
     @override
     def state(self) -> dict:
         state = {}
-        for layer in self.layers:
-            state[layer.__repr__()] = layer.state
+        for i, layer in enumerate(self.layers):
+            state[f"l{i}:{layer.__repr__()}"] = layer.state
 
         return state
 
@@ -47,8 +47,8 @@ class Sequential(Layer):
     def set_state(self, states: dict) -> None:
         assert len(self.layers) == len(states.keys())
 
-        for layer in self.layers:
-            state = states[layer.__repr__()]
+        for i, layer in enumerate(self.layers):
+            state = states[f"l{i}:{layer.__repr__()}"]
             layer.set_state(state)
 
     @override
