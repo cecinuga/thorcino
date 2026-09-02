@@ -146,7 +146,7 @@ class Trainer:
         return self.model.state
     
     def _set_model_state(self, state: dict) -> None:
-        pass
+        self.model.set_state(state)
 
     def _get_optimizer_state(self):
         return self.optimizer.state
@@ -210,6 +210,3 @@ class Trainer:
         if 'scheduler_state' in checkpoint:
             self._set_scheduler_state(checkpoint['scheduler_state'])
         """
-
-    def _set_model_state(self, state: list[Tensor]) -> None:
-        
