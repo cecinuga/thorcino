@@ -60,7 +60,7 @@ class Trainer:
 
         return total_loss, accumulated_loss, num_batches
 
-    def train_epoch(self, dataloader: DataLoader, accumulation_steps:int = 1) -> float:
+    def train_epoch(self, dataloader:DataLoader, accumulation_steps:int = 1) -> float:
         """Run one epoch, updating parameters every `accumulation_steps` batches; returns the average per-batch loss."""
         self.model.train()
 
@@ -201,7 +201,7 @@ class Trainer:
         self.history = checkpoint['history']
         self.training = checkpoint['training_mode']
 
-        if 'model_state' in checkpoint:
+        if 'model_state' in checkpoint and checkpoint['model_state'] is not None:
             self._set_model_state(checkpoint['model_state'])
 
         """

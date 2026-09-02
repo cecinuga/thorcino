@@ -63,14 +63,14 @@ class Linear(Layer):
     @property
     @override
     def state(self) -> dict:
-        data = { 'W': self.weights, }
+        data = { 'W': self.weights.data, }
         if self.bias is not None:
-            data['b'] = self.bias
+            data['b'] = self.bias.data
 
         return data
     
     @override
     def set_state(self, state: dict) -> None:
-        self.W = state['W']
+        self.weights.data = state['W']
         if self.bias is not None:
-            self.bias = state['b']
+            self.bias.data = state['b']

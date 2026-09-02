@@ -34,5 +34,5 @@ class Layer(ABC):
         return {self.__repr__(): {}}
     
     @override
-    def set_state(self) -> None:
+    def set_state(self, state: dict) -> None:
         pass

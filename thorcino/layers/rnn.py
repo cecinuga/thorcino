@@ -85,18 +85,18 @@ class RNN(Layer):
     @property
     @override
     def state(self) -> dict:
-        data = { 'W_xh': self.weights_input,  'W_hh': self.weighs_hidden }
+        data = { 'W_xh': self.weights_input.data,  'W_hh': self.weighs_hidden.data }
         if self.bias_hidden is not None:
-            data['b_h'] = self.bias_hidden
+            data['b_h'] = self.bias_hidden.data
 
         return data
     
     @override
-    def set_state(self, state) -> None:
-        self.weights_input = state['W_xh']
-        self.weighs_hidden = state['W_hh']
+    def set_state(self, state: dict) -> None:
+        self.weights_input.data = state['W_xh']
+        self.weighs_hidden.data = state['W_hh']
         if self.bias_hidden is not None:
-            self.bias_hidden = state['b_h']
+            self.bias_hidden.data = state['b_h']
 
     @override
     def train(self) -> None:

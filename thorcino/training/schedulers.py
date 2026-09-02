@@ -7,10 +7,14 @@ class Schedule(ABC):
     def get_lr(self, epoch: int) -> float:
         pass
 
+    @property
     @abstractmethod
-    def get_state(self) -> dict[str, int|float]:
+    def state(self) -> dict[str, int|float]:
         pass
 
+    @abstractmethod
+    def set_state(self, dict) -> None:
+        pass
 
 class CosineSchedule(Schedule):
     def __init__(self, max_lr: float, min_lr: float, total_epochs: int):
@@ -28,6 +32,11 @@ class CosineSchedule(Schedule):
         cosine_factor:np.ndarray = (1 + np.cos(np.pi * epoch / self.total_epochs)) / 2
         return float(self.min_lr + (self.max_lr - self.min_lr) * cosine_factor)
 
+    @property
     @override
-    def get_state(self) -> dict[str, int|float]:
+    def state(self) -> dict[str, int|float]:
         return {'max_lr': self.max_lr, 'min_lr': self.min_lr, 'total_epochs': self.total_epochs}
+    
+    @override
+    def set_state(self, dict) -> None:
+        self.max_lr, self.min_lr, self.total_epochs = dict['max_lr'], dict['min_lr'], dict['total_epochs']
