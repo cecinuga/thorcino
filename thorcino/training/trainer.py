@@ -150,11 +150,17 @@ class Trainer:
 
     def _get_optimizer_state(self):
         return self.optimizer.state
+    
+    def _set_optimizer_state(self, state: dict) -> None:
+        self.optimizer.set_state(state)
 
     def _get_scheduler_state(self):
         if self.scheduler is not None:
             return self.scheduler.state
         return None
+    
+    def _set_scheduler_state(self, state: dict) -> None:
+        self.scheduler.set_state(state)
 
     @property
     def train_loss(self):
@@ -201,12 +207,7 @@ class Trainer:
         self.history = checkpoint['history']
         self.training = checkpoint['training_mode']
 
-        if 'model_state' in checkpoint and checkpoint['model_state'] is not None:
-            self._set_model_state(checkpoint['model_state'])
-
-        """
-        if 'optimizer_state' in checkpoint:
-            self._set_optimizer_state(checkpoint['optimizer_state'])
-        if 'scheduler_state' in checkpoint:
-            self._set_scheduler_state(checkpoint['scheduler_state'])
-        """
+        self._set_model_state(checkpoint['model_state'])
+        self._set_optimizer_state(checkpoint['optimizer_state'])
+        self._set_scheduler_state(checkpoint['scheduler_state'])
+        

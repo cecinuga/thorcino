@@ -17,7 +17,11 @@ class Optimizer:
         raise NotImplementedError()
 
     @property
-    def state(self) -> Any:
+    def state(self) -> dict:
+        raise NotImplementedError()
+    
+    @property
+    def set_state(self, state: dict) -> None:
         raise NotImplementedError()
 
 class SGD(Optimizer):
@@ -42,6 +46,11 @@ class SGD(Optimizer):
     @property
     def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
     
 class SGD_DL2(Optimizer):
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0, bias_decay:float = 0.0):
@@ -70,6 +79,11 @@ class SGD_DL2(Optimizer):
     @property
     def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
+
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
 
 class SGDM(Optimizer):
     def __init__(self, params: list[Tensor], lr:float = 0.01, momentum:float = 0.0, weight_decay:float = 0.0):
@@ -106,6 +120,13 @@ class SGDM(Optimizer):
     @property
     def state(self):
         return {'lr': self.lr, 'weight_decay': self.weight_decay, 'momentum': self.momentum, 'momentum_buffer': self.momentum_buffer}
+
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
+        self.momentum = state['momentum']
+        self.momentum_buffer = state['momentum_buffer']
 
 
 class Adam(Optimizer):
@@ -152,6 +173,14 @@ class Adam(Optimizer):
             'm_buffers': self.m_buffers,
             'v_buffers': self.v_buffers
         }
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.eps = state['eps']
+        self.beta1, self.beta2 = state['betas']
+        self.m_buffers = state['m_buffers']
+        self.v_buffers = state['v_buffers']
 
 
 class AdamW(Optimizer):
@@ -205,3 +234,11 @@ class AdamW(Optimizer):
             'm_buffers': self.m_buffers,
             'v_buffers': self.v_buffers
         }
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.eps = state['eps']
+        self.beta1, self.beta2 = state['betas']
+        self.m_buffers = state['m_buffers']
+        self.v_buffers = state['v_buffers']
