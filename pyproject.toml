@@ -1,6 +1,6 @@
 [project]
 name = "thorcino"
-version = "1.0.0"
+version = "1.1.0"
 description = "A minimal, educational deep-learning framework built from scratch on top of NumPy"
 readme = "README.md"
 requires-python = ">=3.14"
