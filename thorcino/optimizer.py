@@ -169,6 +169,7 @@ class Adam(Optimizer):
         return {
             'lr': self.lr,
             'eps': self.eps,
+            'step_count': self.step_count,
             'betas': (self.beta1, self.beta2),
             'm_buffers': self.m_buffers,
             'v_buffers': self.v_buffers
@@ -178,6 +179,7 @@ class Adam(Optimizer):
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.eps = state['eps']
+        self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()
@@ -229,6 +231,7 @@ class AdamW(Optimizer):
         return {
             'lr': self.lr,
             'eps': self.eps,
+            'step_count': self.step_count,
             'betas': (self.beta1, self.beta2),
             'weight_decay': self.weight_decay,
             'm_buffers': self.m_buffers,
@@ -239,6 +242,7 @@ class AdamW(Optimizer):
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.eps = state['eps']
+        self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()
