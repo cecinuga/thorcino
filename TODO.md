@@ -1,9 +1,3 @@
-[checkpoint](thorcino/optimizer.py)
-[checkpoint](thorcino/training/schedulers.py)
-
-4. Optimizer e scheduler non vengono mai ripristinati
-save() serializza optimizer_state e scheduler_state, ma load() li ha commentati (trainer.py:200-205) e i metodi _set_optimizer_state/_set_scheduler_state non esistono — decommentare così com'è dà AttributeError. Conseguenze concrete sul resume:
-
 [checkpoint](thorcino/layers/)
 
 6. Nessuna validazione di shape in set_state

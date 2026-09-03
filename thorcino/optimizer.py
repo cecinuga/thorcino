@@ -125,8 +125,8 @@ class SGDM(Optimizer):
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.weight_decay = state['weight_decay']
-        self.momentum = state['momentum']
-        self.momentum_buffer = state['momentum_buffer']
+        self.momentum = state['momentum'].copy()
+        self.momentum_buffer = state['momentum_buffer'].copy()
 
 
 class Adam(Optimizer):
@@ -179,8 +179,8 @@ class Adam(Optimizer):
         self.lr = state['lr']
         self.eps = state['eps']
         self.beta1, self.beta2 = state['betas']
-        self.m_buffers = state['m_buffers']
-        self.v_buffers = state['v_buffers']
+        self.m_buffers = state['m_buffers'].copy()
+        self.v_buffers = state['v_buffers'].copy()
 
 
 class AdamW(Optimizer):
@@ -240,5 +240,5 @@ class AdamW(Optimizer):
         self.lr = state['lr']
         self.eps = state['eps']
         self.beta1, self.beta2 = state['betas']
-        self.m_buffers = state['m_buffers']
-        self.v_buffers = state['v_buffers']
+        self.m_buffers = state['m_buffers'].copy()
+        self.v_buffers = state['v_buffers'].copy()
