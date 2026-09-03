@@ -14,9 +14,6 @@ class Tensor:
             # Build a batched tensor from a list of Tensors, e.g. Tensor([t1, t2, ...]).
             data = np.stack([t.data for t in data])
         self.data: np.ndarray = np.array(data, dtype=np.float32)
-        self.shape = self.data.shape
-        self.size = self.data.size
-        self.dtype = self.data.dtype
         self.requires_grad:bool = requires_grad
         self.grad: np.ndarray|None = None
         self._grad_fn: Function|None = None

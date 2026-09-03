@@ -139,7 +139,7 @@ class SGDM(Optimizer):
         self.weight_decay = state['weight_decay']
         self.momentum = state['momentum']
 
-        assert self.momentum_buffer.shape == state['momentum_buffer'].shape
+        assert len(self.momentum_buffer) == len(state['momentum_buffer'])
         self.momentum_buffer = state['momentum_buffer'].copy()
 
 
@@ -198,8 +198,8 @@ class Adam(Optimizer):
         self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
 
-        assert self.m_buffers.shape == state['m_buffers'].shape
-        assert self.v_buffers.shape == state['v_buffers'].shape
+        assert len(self.m_buffers) == len(state['m_buffers'])
+        assert len(self.v_buffers) == len(state['v_buffers'])
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()
 
@@ -267,7 +267,7 @@ class AdamW(Optimizer):
         self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
 
-        assert self.m_buffers.shape == state['m_buffers'].shape
-        assert self.v_buffers.shape == state['v_buffers'].shape
+        assert len(self.m_buffers) == len(state['m_buffers'])
+        assert len(self.v_buffers) == len(state['v_buffers'])
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()
