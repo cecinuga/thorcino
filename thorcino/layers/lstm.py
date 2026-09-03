@@ -146,6 +146,19 @@ class LSTM(Layer):
     
     @override
     def set_state(self, state: dict) -> None:
+        assert self.weights_input.shape == state['W_i'].shape
+        assert self.weights_forget.shape == state['W_f'].shape
+        assert self.weights_cell.shape == state['W_c'].shape
+        assert self.weights_output.shape == state['W_o'].shape
+        assert self.weights_h_input.shape == state['W_hi'].shape
+        assert self.weights_h_forget.shape == state['W_hf'].shape
+        assert self.weights_h_cell == state['W_hc'].shape
+        assert self.weights_h_output.shape == state['W_ho'].shape
+        assert self.bias_input.shape == state['b_i'].shape
+        assert self.bias_forget.shape == state['b_f'].shape
+        assert self.bias_cell.shape == state['b_c'].shape
+        assert self.bias_output.shape == state['b_o'].shape
+
         self.weights_input.data = state['W_i'].copy()
         self.weights_forget.data = state['W_f'].copy()
         self.weights_cell.data = state['W_c'].copy()
