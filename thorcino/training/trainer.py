@@ -30,6 +30,9 @@ def clip_grad_norm(parameters: list[Tensor], max_norm: float = 1.0) -> float:
     return float(total_norm)
 
 class Trainer:
+    """Drives the train/eval loop over a model, recording per-epoch metrics in `history`
+    and exposing pickle checkpoints through `save`/`load`."""
+
     def __init__(self,
         model: Layer,
         loss_fn: Loss,
@@ -50,6 +53,8 @@ class Trainer:
         self.history:dict[str, list[float]] = {'train_loss': [], 'eval_loss': [], 'accuracy': [], 'lr': []}
 
     def _accumulate(self, total_loss: float, accumulated_loss: float, num_batches: int):
+        """Clip, apply one optimizer step, clear the grads, and fold `accumulated_loss`
+        into the running totals."""
         if self.grad_clip_norm is not None:
             _ = clip_grad_norm(self.model.parameters, self.grad_clip_norm)
 
@@ -60,7 +65,7 @@ class Trainer:
 
         return total_loss, accumulated_loss, num_batches
 
-    def train_epoch(self, dataloader: DataLoader, accumulation_steps:int = 1) -> float:
+    def train_epoch(self, dataloader:DataLoader, accumulation_steps:int = 1) -> float:
         """Run one epoch, updating parameters every `accumulation_steps` batches; returns the average per-batch loss."""
         self.model.train()
 
@@ -142,15 +147,30 @@ class Trainer:
         self.history['eval_loss'].append(avg_loss)
         return avg_loss, accuracy
 
-    def _get_model_state(self) -> list[Tensor]:
-        return self.model.parameters
+    def _get_model_state(self) -> dict:
+        return self.model.state
+    
+    def _set_model_state(self, state: dict, training: bool) -> None:
+        if training:
+            self.model.train()
+        else:
+            self.model.eval()
+        self.model.set_state(state)
 
     def _get_optimizer_state(self):
-        return self.optimizer.get_state()
+        return self.optimizer.state
+    
+    def _set_optimizer_state(self, state: dict) -> None:
+        self.optimizer.set_state(state)
 
     def _get_scheduler_state(self):
         if self.scheduler is not None:
-            return self.scheduler.get_state()
+            return self.scheduler.state
+        return None
+    
+    def _set_scheduler_state(self, state: dict) -> None:
+        if self.scheduler is not None:
+            self.scheduler.set_state(state)
         return None
 
     @property
@@ -162,6 +182,7 @@ class Trainer:
         return self.history['eval_loss']
 
     def save(self, path: Path|str) -> None:
+        """Pickle a full checkpoint: metrics plus model, optimizer and scheduler state."""
         checkpoint = {
             'epoch':            self.epoch,
             'step':             self.step,
@@ -171,13 +192,25 @@ class Trainer:
             'optimizer_state':  self._get_optimizer_state(),
             'scheduler_state':  self._get_scheduler_state(),
         }
+        self._save_artifact(path, checkpoint)
 
+    def save_metrics(self, path: Path|str) -> None:
+        """Pickle epoch, step and history only - no model or optimizer state."""
+        checkpoint = {
+            'epoch':            self.epoch,
+            'step':             self.step,
+            'history':          self.history,
+        }
+        self._save_artifact(path, checkpoint)
+
+    def _save_artifact(self, path: Path|str, artifact: dict) -> None:
         Path(path).parent.mkdir(parents=True, exist_ok=True)
         with open(path, 'wb') as f:
-            pickle.dump(checkpoint, f)
+            pickle.dump(artifact, f)
 
     def load(self, path: Path|str) -> None:
-        """Restore epoch/step/history/training-mode from a checkpoint; model, optimizer and scheduler state are not restored."""
+        """Restore a full checkpoint in place: counters, history, mode, and the model,
+        optimizer and scheduler state. Requires a `save()` file, not `save_metrics()`."""
         with open(path, 'rb') as f:
             checkpoint = pickle.load(f)
 
@@ -186,12 +219,7 @@ class Trainer:
         self.history = checkpoint['history']
         self.training = checkpoint['training_mode']
 
-        """
-        # Restore states (simplified for educational purposes)
-        if 'model_state' in checkpoint:
-            self._set_model_state(checkpoint['model_state'])
-        if 'optimizer_state' in checkpoint:
-            self._set_optimizer_state(checkpoint['optimizer_state'])
-        if 'scheduler_state' in checkpoint:
-            self._set_scheduler_state(checkpoint['scheduler_state'])
-        """
+        self._set_model_state(checkpoint['model_state'], checkpoint['training_mode'])
+        self._set_optimizer_state(checkpoint['optimizer_state'])
+        self._set_scheduler_state(checkpoint['scheduler_state'])
+        

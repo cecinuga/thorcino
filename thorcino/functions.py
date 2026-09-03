@@ -4,6 +4,7 @@ def relu(x: np.ndarray) -> np.ndarray:
     return np.maximum(0, x)
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
+    """Logistic function, branching on the sign of `x` to keep `exp` from overflowing."""
     # 1. Clip to prevent raw overflow
     z = np.clip(x, -500, 500)
 
@@ -25,10 +26,11 @@ def tanh(x: np.ndarray) -> np.ndarray:
     return np.tanh(x)
 
 def gelu(x: np.ndarray) -> np.ndarray:
-    # Sigmoid approximation of GELU, not the exact erf-based formula.
+    """Sigmoid (`x * sigmoid(1.702x)`) approximation of GELU, not the exact erf form."""
     return sigmoid(x * 1.702) * x
 
 def softmax(x: np.ndarray, dim:int=-1) -> np.ndarray:
+    """Softmax over `dim`, max-shifted so the exponentials cannot overflow."""
     # 1. Shift values so max is 0
     x_max = np.max(x, axis=dim, keepdims=True)
     x_shifted = x - x_max
@@ -41,6 +43,7 @@ def softmax(x: np.ndarray, dim:int=-1) -> np.ndarray:
     return exp_values/exp_sum
 
 def log_softmax(x: np.ndarray, dim:int=-1) -> np.ndarray:
+    """Log-softmax over `dim` via log-sum-exp, avoiding the `log(0)` of `log(softmax(x))`."""
     # 1. Find max for stability
     max_vals = np.max(x, axis=dim, keepdims=True)
 
@@ -62,6 +65,7 @@ def mse(predictions: np.ndarray, targets: np.ndarray) -> np.ndarray:
     return  np.array(np.mean(squared_error(predictions, targets)))
 
 def cross_entropy(logits: np.ndarray, targets: np.ndarray) -> np.ndarray:
+    """Mean negative log-likelihood of raw `logits`; `targets` are class indices, not one-hot."""
     # 1. Apply stable log_softmax
     log_probs = log_softmax(logits, dim=-1)
 
@@ -77,6 +81,7 @@ def cross_entropy(logits: np.ndarray, targets: np.ndarray) -> np.ndarray:
     return np.array(result)
 
 def binary_cross_entropy(predictions: np.ndarray, targets: np.ndarray) -> np.ndarray:
+    """Mean BCE over probabilities (not logits), clipped to [1e-7, 1-1e-7] to avoid `log(0)`."""
     # 1. Clip to prevent log(0) -> NaN
     eps = 1e-7
     clamped_preds = np.clip(predictions, eps, 1 - eps)

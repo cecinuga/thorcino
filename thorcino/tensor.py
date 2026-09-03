@@ -9,13 +9,11 @@ class Tensor:
     """NumPy-backed array that records the operation that produced it for reverse-mode autodiff."""
 
     def __init__(self, data, requires_grad:bool=True, role:str|None=None):
+        """Wrap `data` as a float32 array; `role` tags the tensor for graph rendering."""
         if isinstance(data, (list, tuple)) and len(data) > 0 and isinstance(data[0], Tensor):
             # Build a batched tensor from a list of Tensors, e.g. Tensor([t1, t2, ...]).
             data = np.stack([t.data for t in data])
         self.data: np.ndarray = np.array(data, dtype=np.float32)
-        self.shape = self.data.shape
-        self.size = self.data.size
-        self.dtype = self.data.dtype
         self.requires_grad:bool = requires_grad
         self.grad: np.ndarray|None = None
         self._grad_fn: Function|None = None
@@ -37,6 +35,18 @@ class Tensor:
 
     def numpy(self):
         return self.data
+    
+    @property
+    def shape(self): 
+        return self.data.shape
+    
+    @property
+    def size(self): 
+        return self.data.size
+    
+    @property
+    def dtype(self): 
+        return self.data.dtype
 
     def __getitem__(self, idx: int) -> np.ndarray:
         return Tensor(self.data[idx], requires_grad=self.requires_grad)
@@ -83,6 +93,7 @@ class Tensor:
         return Tensor(self.data * other)
 
     def __pow__(self, other: float) -> Tensor:
+        # Detached: the result carries no _grad_fn, so gradients stop here.
         return Tensor(self.data**other)
 
     def __matmul__(self, other: Tensor | np.ndarray) -> Tensor:
@@ -123,6 +134,7 @@ class Tensor:
         return out
 
     def reshape(self, *shape) -> Tensor:
+        """Reshape to `shape` (a varargs or a single tuple); one `-1` entry is inferred."""
         if len(shape) == 1 and isinstance(shape[0], (tuple, list)):
             new_shape = tuple(shape[0])
         else:
@@ -155,6 +167,7 @@ class Tensor:
         return out
 
     def transpose(self):
+        """Reverse every axis, as `np.transpose` does - not just the last two."""
         from thorcino.autograd import TransposeBackward
         out = Tensor(np.transpose(self.data))
         out._grad_fn = TransposeBackward(self)
@@ -167,16 +180,20 @@ class Tensor:
         return out
 
     def mean(self, axis:int|None = None, keepdims:bool = False) -> Tensor:
+       """Detached mean: the result has no `_grad_fn`, so no gradient flows through it."""
        return Tensor(np.mean(self.data, axis=axis, keepdims=keepdims))
 
     def max(self, axis:int|None = None, keepdims:bool = False) -> Tensor:
+        """Detached max: the result has no `_grad_fn`, so no gradient flows through it."""
         return Tensor(np.max(self.data, axis=axis, keepdims=keepdims))
 
     def min(self, axis:int|None = None, keepdims:bool = False) -> Tensor:
+        """Detached min: the result has no `_grad_fn`, so no gradient flows through it."""
         return Tensor(np.min(self.data, axis=axis, keepdims=keepdims))
 
     def backward(self, gradient:Tensor|None=None):
-        """Compute gradients via backpropagation."""
+        """Accumulate gradients into `.grad` across the graph; `gradient` is required
+        unless this tensor is a scalar. Accumulates, so zero the grads between steps."""
         if not self.requires_grad:
             return
 
@@ -224,9 +241,8 @@ class Tensor:
 
     @staticmethod
     def stack(tensors: list["Tensor"], axis: int = 0) -> Tensor:
-        """Stack a list of tensors along a new axis, keeping them wired into
-        the autograd graph (unlike ``Tensor(np.stack(...))``, which builds a
-        fresh leaf tensor with no ``_grad_fn``)."""
+        """Stack tensors along a new axis, keeping them wired into the autograd graph
+        (unlike ``Tensor(np.stack(...))``, which yields a leaf with no ``_grad_fn``)."""
         out = Tensor(np.stack([t.data for t in tensors], axis=axis))
         if any(t.requires_grad for t in tensors):
             from thorcino.autograd import StackBackward
@@ -238,7 +254,7 @@ class Tensor:
         self.grad = None
 
     def destroy_graph(self) -> None:
-        """Destroy the operations graph"""
+        """Drop the whole upstream graph, freeing the tensors it kept alive."""
         if self._grad_fn is not None:
             for t in self._grad_fn.saved_tensors:
                 t.destroy_graph()

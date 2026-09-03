@@ -6,6 +6,9 @@ from thorcino.functions import mse, cross_entropy, binary_cross_entropy
 from thorcino.tensor import Tensor
 
 class Loss(ABC):
+    """Base loss: subclasses compute a scalar and attach their `grad_fn` to it,
+    which is what makes `backward()` reachable from the loss."""
+
     grad_fn: type[Function] = Function
 
     @abstractmethod
@@ -26,6 +29,8 @@ class MSELoss(Loss):
         return out
 
 class CrossEntropyLoss(Loss):
+    """Softmax cross-entropy over raw logits; `targets` are class indices, not one-hot."""
+
     grad_fn:type[Function] = CrossEntropyLossBackward
 
     @override
@@ -37,6 +42,8 @@ class CrossEntropyLoss(Loss):
 
 
 class BinaryCrossEntropyLoss(Loss):
+    """BCE over probabilities in [0, 1], not logits."""
+
     grad_fn:type[Function] = BCELossBackward
 
     @override

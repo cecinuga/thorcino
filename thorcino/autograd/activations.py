@@ -30,6 +30,8 @@ class TanhBackward(Function):
         return Tensor(grad_output.data * local_grad),
 
 class GELUBackward(Function):
+    """Derivative of the sigmoid GELU approximation, matching `functions.gelu`."""
+
     @override
     def apply(self, grad_output:Tensor) -> tuple[Tensor, ...]:
         t, = self.saved_tensors
@@ -39,6 +41,8 @@ class GELUBackward(Function):
         return Tensor(grad_output.data * local_grad),
 
 class SoftmaxBackward(Function):
+    """Softmax Jacobian-vector product: `s * (g - sum(g * s))` along `dim`."""
+
     def __init__(self, x: Tensor, dim:int):
         super().__init__(x)
         self.dim:int = dim

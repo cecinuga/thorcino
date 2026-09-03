@@ -1,3 +1,8 @@
+"""Activation layers.
+
+Each wires its backward node only while `training`, so an `eval()`-mode activation
+returns a tensor detached from the autograd graph."""
+
 from typing import override
 from thorcino.layers import Layer
 from thorcino.tensor import Tensor
@@ -81,6 +86,8 @@ class Tanh(Layer):
         self.training = False
 
 class GELU(Layer):
+    """Sigmoid-approximated GELU."""
+
     def __init__(self):
         self.training = True
 
@@ -105,6 +112,7 @@ class Softmax(Layer):
 
     @override
     def forward(self, x: Tensor, dim: int = -1) -> Tensor:
+        """Normalize along `dim` (last axis by default)."""
         res = Tensor(softmax(x.data, dim))
         if self.training:
             res._grad_fn = SoftmaxBackward(x, dim)

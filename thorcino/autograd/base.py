@@ -5,9 +5,13 @@ if TYPE_CHECKING:
     from thorcino.tensor import Tensor
 
 def enable_autograd(quiet:bool=False) -> None:
+    """No-op kept for API compatibility: autograd is always on."""
     pass
 
 class Function:
+    """Backward node of the autograd graph: holds one operation's operands and
+    turns an incoming gradient into their gradients."""
+
     def __init__(self, *tensors: Tensor):
         # Operands needed to compute the gradients in apply().
         self.saved_tensors:tuple[Tensor, ...] = tensors
@@ -15,5 +19,5 @@ class Function:
         self.next_functions:list[Function|None] = [t._grad_fn for t in tensors]
 
     def apply(self, grad_output:Tensor)-> tuple[Tensor, ...]:
-        """Compute gradients for the inputs."""
+        """Return one gradient per entry of `saved_tensors`, in the same order."""
         raise NotImplementedError()

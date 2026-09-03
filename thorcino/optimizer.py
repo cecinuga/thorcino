@@ -4,6 +4,9 @@ from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
 from thorcino.tensor import Tensor
 
 class Optimizer:
+    """Base optimizer: owns the parameter list, the learning rate and the step counter.
+    `step()` reads `param.grad` and mutates `param.data` in place."""
+
     def __init__(self, params: list[Tensor], lr: float):
         self.params: list[Tensor] = params
         self.step_count: int = 0
@@ -16,10 +19,19 @@ class Optimizer:
     def step(self) -> None:
         raise NotImplementedError()
 
-    def get_state(self) -> Any:
+    @property
+    def state(self) -> dict:
+        """Picklable hyperparameters plus any per-parameter buffers, for checkpointing."""
+        raise NotImplementedError()
+    
+    def set_state(self, state: dict) -> None:
+        """Restore what `state` returned, onto the same parameter list in the same order."""
         raise NotImplementedError()
 
 class SGD(Optimizer):
+    """Plain SGD; `weight_decay` is applied only to parameters tagged as weights,
+    leaving biases undecayed."""
+
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -38,10 +50,18 @@ class SGD(Optimizer):
             param.data -= self.lr * grad_data
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
     
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
+    
 class SGD_DL2(Optimizer):
+    """SGD with separate L2 decay rates for weight-tagged and bias-tagged parameters."""
+
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0, bias_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -65,10 +85,19 @@ class SGD_DL2(Optimizer):
             param.data -= self.lr * grad_data
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return { 'lr': self.lr, 'weight_decay': self.weight_decay }
 
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
+
 class SGDM(Optimizer):
+    """SGD with classic (non-Nesterov) momentum; unlike `SGD`, `weight_decay` is added
+    to the gradient of every parameter regardless of its role."""
+
     def __init__(self, params: list[Tensor], lr:float = 0.01, momentum:float = 0.0, weight_decay:float = 0.0):
         super().__init__(params, lr)
         self.momentum_buffer:list[np.ndarray|None] = [None for _ in params]
@@ -100,11 +129,23 @@ class SGDM(Optimizer):
         return self.momentum > 0
 
     @override
-    def get_state(self):
+    @property
+    def state(self):
         return {'lr': self.lr, 'weight_decay': self.weight_decay, 'momentum': self.momentum, 'momentum_buffer': self.momentum_buffer}
+
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.weight_decay = state['weight_decay']
+        self.momentum = state['momentum']
+
+        assert len(self.momentum_buffer) == len(state['momentum_buffer'])
+        self.momentum_buffer = state['momentum_buffer'].copy()
 
 
 class Adam(Optimizer):
+    """Adam: per-parameter step from bias-corrected first and second gradient moments."""
+
     def __init__(self, params: list[Tensor], lr: float=0.001, betas:tuple[float, float]=(0.9, 0.999), eps: float=1e-8):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -138,18 +179,35 @@ class Adam(Optimizer):
             # 3. Update parameter (Adaptive step)
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
 
-        @override
-        def get_state(self):
-            return {
-                'lr': self.lr,
-                'eps': self.eps,
-                'betas': (self.beta1, self.beta2),
-                'm_buffers': self.m_buffers,
-                'v_buffers': self.v_buffers
-            }
+    @override
+    @property
+    def state(self):
+        return {
+            'lr': self.lr,
+            'eps': self.eps,
+            'step_count': self.step_count,
+            'betas': (self.beta1, self.beta2),
+            'm_buffers': self.m_buffers,
+            'v_buffers': self.v_buffers
+        }
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.eps = state['eps']
+        self.step_count = state['step_count']
+        self.beta1, self.beta2 = state['betas']
+
+        assert len(self.m_buffers) == len(state['m_buffers'])
+        assert len(self.v_buffers) == len(state['v_buffers'])
+        self.m_buffers = state['m_buffers'].copy()
+        self.v_buffers = state['v_buffers'].copy()
 
 
 class AdamW(Optimizer):
+    """Adam with decoupled weight decay: the decay shrinks `param.data` directly instead
+    of entering the gradient, so it never feeds the moment estimates."""
+
     def __init__(self, params: list[Tensor], lr: float=0.001, betas:tuple[float, float]=(0.9, 0.999), eps: float=1e-8, weight_decay: float=0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -189,13 +247,27 @@ class AdamW(Optimizer):
             # Apply gradient-based update
             param.data -= (self.lr * m_hat) / (np.sqrt(v_hat) + self.eps)
 
-        @override
-        def get_state(self):
-            return {
-                'lr': self.lr,
-                'eps': self.eps,
-                'betas': (self.beta1, self.beta2),
-                'weight_decay': self.weight_decay,
-                'm_buffers': self.m_buffers,
-                'v_buffers': self.v_buffers
-            }
+    @override
+    @property
+    def state(self):
+        return {
+            'lr': self.lr,
+            'eps': self.eps,
+            'step_count': self.step_count,
+            'betas': (self.beta1, self.beta2),
+            'weight_decay': self.weight_decay,
+            'm_buffers': self.m_buffers,
+            'v_buffers': self.v_buffers
+        }
+    
+    @override
+    def set_state(self, state: dict) -> None:
+        self.lr = state['lr']
+        self.eps = state['eps']
+        self.step_count = state['step_count']
+        self.beta1, self.beta2 = state['betas']
+
+        assert len(self.m_buffers) == len(state['m_buffers'])
+        assert len(self.v_buffers) == len(state['v_buffers'])
+        self.m_buffers = state['m_buffers'].copy()
+        self.v_buffers = state['v_buffers'].copy()
