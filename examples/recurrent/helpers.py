@@ -90,3 +90,27 @@ def parse_vect(input: np.ndarray) -> bool:
         return False
 
     return True
+
+
+"""Matplotlib"""
+import matplotlib.pyplot as plt
+
+def plot_metrics(title:str, metrics: dict, epochs: int, eval_step: int):
+    fig, (loss_ax, accuracy_ax) = plt.subplots(1, 2, figsize=(12, 5))
+    fig.suptitle(title)
+
+    loss_ax.plot(range(epochs), metrics['train_loss'], label="train")
+    loss_ax.plot(range(0, epochs, eval_step), metrics['eval_loss'], label="test")
+    loss_ax.set_title("Losses")
+    loss_ax.set_xlabel("epoch")
+    loss_ax.set_ylabel("loss")
+    loss_ax.legend()
+
+    accuracy_ax.set_title("Accuracy on test sequence")
+    accuracy_ax.plot(range(0, epochs, eval_step), metrics['accuracy'], label="accuracy")
+    accuracy_ax.set_xlabel("epoch")
+    accuracy_ax.set_ylabel("accuracy")
+    accuracy_ax.legend()
+
+    fig.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.show()

@@ -1,3 +1,6 @@
+[scaling_law](./examples/recurrent/scaling_law/main.ipynb)
+add the recover of backups and metrics support
+
 [loader](core/loader.py)
 1) add parallel loading via multi threading
 2) add pre fetching of N+1 batches
