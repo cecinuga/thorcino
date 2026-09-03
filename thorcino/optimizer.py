@@ -20,7 +20,6 @@ class Optimizer:
     def state(self) -> dict:
         raise NotImplementedError()
     
-    @property
     def set_state(self, state: dict) -> None:
         raise NotImplementedError()
 
@@ -125,7 +124,9 @@ class SGDM(Optimizer):
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.weight_decay = state['weight_decay']
-        self.momentum = state['momentum'].copy()
+        self.momentum = state['momentum']
+
+        assert self.momentum_buffer.shape == state['momentum_buffer'].shape
         self.momentum_buffer = state['momentum_buffer'].copy()
 
 
@@ -181,6 +182,9 @@ class Adam(Optimizer):
         self.eps = state['eps']
         self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
+
+        assert self.m_buffers.shape == state['m_buffers'].shape
+        assert self.v_buffers.shape == state['v_buffers'].shape
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()
 
@@ -244,5 +248,8 @@ class AdamW(Optimizer):
         self.eps = state['eps']
         self.step_count = state['step_count']
         self.beta1, self.beta2 = state['betas']
+
+        assert self.m_buffers.shape == state['m_buffers'].shape
+        assert self.v_buffers.shape == state['v_buffers'].shape
         self.m_buffers = state['m_buffers'].copy()
         self.v_buffers = state['v_buffers'].copy()

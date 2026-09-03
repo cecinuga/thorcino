@@ -74,8 +74,8 @@ class Linear(Layer):
     @override
     def set_state(self, state: dict) -> None:
         assert self.weights.shape == state['W'].shape
-        assert self.bias.shape == state['b'].shape
-        
+
         self.weights.data = state['W'].copy()
         if self.bias is not None:
+            assert self.bias.shape == state['b'].shape
             self.bias.data = state['b'].copy()

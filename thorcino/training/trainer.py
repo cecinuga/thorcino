@@ -145,7 +145,11 @@ class Trainer:
     def _get_model_state(self) -> dict:
         return self.model.state
     
-    def _set_model_state(self, state: dict) -> None:
+    def _set_model_state(self, state: dict, training: bool) -> None:
+        if training:
+            self.model.train()
+        else:
+            self.model.eval()
         self.model.set_state(state)
 
     def _get_optimizer_state(self):
@@ -160,7 +164,9 @@ class Trainer:
         return None
     
     def _set_scheduler_state(self, state: dict) -> None:
-        self.scheduler.set_state(state)
+        if self.scheduler is not None:
+            self.scheduler.set_state(state)
+        return None
 
     @property
     def train_loss(self):
@@ -198,7 +204,7 @@ class Trainer:
             pickle.dump(artifact, f)
 
     def load(self, path: Path|str) -> None:
-        """Restore epoch/step/history/training-mode from a checkpoint; model, optimizer and scheduler state are not restored."""
+        """Restore epoch/step/history/training-mode from a checkpoint"""
         with open(path, 'rb') as f:
             checkpoint = pickle.load(f)
 
@@ -207,7 +213,7 @@ class Trainer:
         self.history = checkpoint['history']
         self.training = checkpoint['training_mode']
 
-        self._set_model_state(checkpoint['model_state'])
+        self._set_model_state(checkpoint['model_state'], checkpoint['training_mode'])
         self._set_optimizer_state(checkpoint['optimizer_state'])
         self._set_scheduler_state(checkpoint['scheduler_state'])
         

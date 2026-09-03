@@ -152,7 +152,7 @@ class LSTM(Layer):
         assert self.weights_output.shape == state['W_o'].shape
         assert self.weights_h_input.shape == state['W_hi'].shape
         assert self.weights_h_forget.shape == state['W_hf'].shape
-        assert self.weights_h_cell == state['W_hc'].shape
+        assert self.weights_h_cell.shape == state['W_hc'].shape
         assert self.weights_h_output.shape == state['W_ho'].shape
         assert self.bias_input.shape == state['b_i'].shape
         assert self.bias_forget.shape == state['b_f'].shape

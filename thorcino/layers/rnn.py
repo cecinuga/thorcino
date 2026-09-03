@@ -97,11 +97,12 @@ class RNN(Layer):
     def set_state(self, state: dict) -> None:
         assert self.weights_input.shape == state['W_xh'].shape
         assert self.weighs_hidden.shape == state['W_hh'].shape
-        assert self.bias_hidden.shape == state['b_h'].shape
-
+        
         self.weights_input.data = state['W_xh'].copy()
         self.weighs_hidden.data = state['W_hh'].copy()
+        
         if self.bias_hidden is not None:
+            assert self.bias_hidden.shape == state['b_h'].shape
             self.bias_hidden.data = state['b_h'].copy()
 
     @override
