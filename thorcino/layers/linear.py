@@ -6,6 +6,8 @@ from thorcino.tensor import Tensor
 
 
 class Linear(Layer):
+    """Fully connected layer `y = xW + b`, with Xavier-initialised weights."""
+
     def __init__(self, in_feature:int, out_feature:int, bias:bool=True):
         self.training: bool = True
         self.in_feature = in_feature
@@ -65,6 +67,7 @@ class Linear(Layer):
     @property
     @override
     def state(self) -> dict:
+        """Copies of the weights under 'W' and, when present, the bias under 'b'."""
         data = { 'W': self.weights.data.copy(), }
         if self.bias is not None:
             data['b'] = self.bias.data.copy()
@@ -73,6 +76,7 @@ class Linear(Layer):
     
     @override
     def set_state(self, state: dict) -> None:
+        """Copy 'W' (and 'b') into the existing parameters; shapes must already match."""
         assert self.weights.shape == state['W'].shape
 
         self.weights.data = state['W'].copy()

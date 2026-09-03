@@ -6,6 +6,10 @@ from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 class LSTM(Layer):
+    """LSTM cell unrolled over the time axis. `out_type` picks what `forward` returns:
+    'n_to_m' every hidden state, 'n_to_1' only the last one. Hidden and cell state
+    start at zero on each call, so sequences are never carried over."""
+
     valid_types = {"n_to_m", "n_to_1"}
 
     def __init__(
@@ -91,7 +95,9 @@ class LSTM(Layer):
 
         Returns
         -------
-        outs: output for each step stacked along first dim
+        outs: with out_type='n_to_m', every hidden state stacked on the time axis
+            (batch_size, sequence_length, hidden_units); with 'n_to_1', the last
+            hidden state only (batch_size, hidden_units)
         """
         if X.dim == 1:
             X = X.reshape(1, -1)
@@ -136,6 +142,8 @@ class LSTM(Layer):
     @property
     @override
     def state(self) -> dict:
+        """Copies of the twelve parameters, keyed 'W_<gate>' (input), 'W_h<gate>'
+        (recurrent) and 'b_<gate>' for gates i/f/c/o."""
         data = {
             'W_i': self.weights_input.data.copy(), 'W_f': self.weights_forget.data.copy(), 'W_c': self.weights_cell.data.copy(), 'W_o': self.weights_output.data.copy(),
             'W_hi': self.weights_h_input.data.copy(), 'W_hf': self.weights_h_forget.data.copy(), 'W_hc': self.weights_h_cell.data.copy(), 'W_ho': self.weights_h_output.data.copy(),
@@ -146,6 +154,7 @@ class LSTM(Layer):
     
     @override
     def set_state(self, state: dict) -> None:
+        """Copy the saved arrays into the existing parameters; shapes must already match."""
         assert self.weights_input.shape == state['W_i'].shape
         assert self.weights_forget.shape == state['W_f'].shape
         assert self.weights_cell.shape == state['W_c'].shape

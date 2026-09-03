@@ -1,3 +1,5 @@
+"""Minimal NumPy-backed autograd engine and neural-network toolkit."""
+
 from thorcino.tensor import Tensor
 from thorcino.autograd import Function
 from thorcino.layers import Layer, Linear, Dropout, RNN, Sequential

@@ -4,6 +4,10 @@ from thorcino.tensor import Tensor
 
 
 class Layer(ABC):
+    """Base layer: subclasses implement `forward` plus the `train`/`eval` mode switch.
+    The parameter and state accessors default to empty, so a layer without weights
+    needs no override."""
+
     @abstractmethod
     def forward(self, x: Tensor) -> Tensor:
         """Compute the layer output."""
@@ -30,7 +34,7 @@ class Layer(ABC):
     
     @property
     def state(self) -> dict:
-        """Return the weights and bias of the layer"""
+        """Picklable snapshot of this layer's parameters, keyed by short names."""
         return {}
     
     @override

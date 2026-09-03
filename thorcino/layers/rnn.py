@@ -6,6 +6,9 @@ from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 class RNN(Layer):
+    """Single recurrent cell unrolled over the time axis, emitting every hidden state.
+    The hidden state starts at zero on each call, so sequences are never carried over."""
+
     def __init__(
         self, 
         in_feature: int,
@@ -52,7 +55,8 @@ class RNN(Layer):
 
         Returns
         -------
-        outs: output for each step stacked along first dim
+        outs: hidden state of every step, stacked on the time axis
+            (batch_size, sequence_length, hidden_units)
         """
         if X.dim == 1:
             X = X.reshape(1, -1)
@@ -87,6 +91,7 @@ class RNN(Layer):
     @property
     @override
     def state(self) -> dict:
+        """Copies of the input/hidden weights ('W_xh', 'W_hh') and the bias ('b_h')."""
         data = { 'W_xh': self.weights_input.data.copy(),  'W_hh': self.weighs_hidden.data.copy() }
         if self.bias_hidden is not None:
             data['b_h'] = self.bias_hidden.data.copy()
@@ -95,6 +100,7 @@ class RNN(Layer):
     
     @override
     def set_state(self, state: dict) -> None:
+        """Copy the saved arrays into the existing parameters; shapes must already match."""
         assert self.weights_input.shape == state['W_xh'].shape
         assert self.weighs_hidden.shape == state['W_hh'].shape
         

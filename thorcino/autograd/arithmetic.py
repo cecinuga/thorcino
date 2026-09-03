@@ -1,3 +1,8 @@
+"""Backward nodes for the tensor arithmetic ops.
+
+Each `apply` returns an empty array in place of the gradient of an operand whose
+`requires_grad` is False, and unbroadcasts the rest back to the operand's shape."""
+
 import numpy as np
 from typing import override
 from thorcino.tensor import Tensor
@@ -69,6 +74,9 @@ class DivBackward(Function):
         return Tensor(grad_a), Tensor(grad_b)
 
 class MatmulBackward(Function):
+    """Gradients of `a @ b`, promoting a 1-D operand to a matrix so the batched
+    `matmul` rules still apply."""
+
     @override
     def apply(self, grad_output: Tensor) -> tuple[Tensor, Tensor]:
         a, b = self.saved_tensors
@@ -89,6 +97,8 @@ class MatmulBackward(Function):
         return Tensor(grad_a), Tensor(grad_b)
 
 class SumBackward(Function):
+    """Broadcasts the incoming gradient back over the axis that was summed away."""
+
     def __init__(self, x: Tensor, axis:int|None = -1, keepdims:bool = True):
         super().__init__(x)
         self.axis:int|None = axis
@@ -130,8 +140,8 @@ class TransposeBackward(Function):
         return Tensor(out),
 
 class StackBackward(Function):
-    """Backward for `Tensor.stack`: splits the incoming gradient back into
-    one chunk per stacked input, along the axis they were stacked on."""
+    """Splits the incoming gradient into one chunk per stacked input, along the
+    axis they were stacked on."""
 
     def __init__(self, *tensors: Tensor, axis: int = 0):
         super().__init__(*tensors)

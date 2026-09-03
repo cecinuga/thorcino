@@ -4,6 +4,9 @@ from thorcino.consts import BIAS_ROLE, WEIGHTS_ROLE
 from thorcino.tensor import Tensor
 
 class Optimizer:
+    """Base optimizer: owns the parameter list, the learning rate and the step counter.
+    `step()` reads `param.grad` and mutates `param.data` in place."""
+
     def __init__(self, params: list[Tensor], lr: float):
         self.params: list[Tensor] = params
         self.step_count: int = 0
@@ -18,12 +21,17 @@ class Optimizer:
 
     @property
     def state(self) -> dict:
+        """Picklable hyperparameters plus any per-parameter buffers, for checkpointing."""
         raise NotImplementedError()
     
     def set_state(self, state: dict) -> None:
+        """Restore what `state` returned, onto the same parameter list in the same order."""
         raise NotImplementedError()
 
 class SGD(Optimizer):
+    """Plain SGD; `weight_decay` is applied only to parameters tagged as weights,
+    leaving biases undecayed."""
+
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -52,6 +60,8 @@ class SGD(Optimizer):
         self.weight_decay = state['weight_decay']
     
 class SGD_DL2(Optimizer):
+    """SGD with separate L2 decay rates for weight-tagged and bias-tagged parameters."""
+
     def __init__(self, params: list[Tensor], lr: float=0.01, weight_decay:float = 0.0, bias_decay:float = 0.0):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -85,6 +95,9 @@ class SGD_DL2(Optimizer):
         self.weight_decay = state['weight_decay']
 
 class SGDM(Optimizer):
+    """SGD with classic (non-Nesterov) momentum; unlike `SGD`, `weight_decay` is added
+    to the gradient of every parameter regardless of its role."""
+
     def __init__(self, params: list[Tensor], lr:float = 0.01, momentum:float = 0.0, weight_decay:float = 0.0):
         super().__init__(params, lr)
         self.momentum_buffer:list[np.ndarray|None] = [None for _ in params]
@@ -131,6 +144,8 @@ class SGDM(Optimizer):
 
 
 class Adam(Optimizer):
+    """Adam: per-parameter step from bias-corrected first and second gradient moments."""
+
     def __init__(self, params: list[Tensor], lr: float=0.001, betas:tuple[float, float]=(0.9, 0.999), eps: float=1e-8):
         super().__init__(params, lr)
         self.lr:float = lr
@@ -190,6 +205,9 @@ class Adam(Optimizer):
 
 
 class AdamW(Optimizer):
+    """Adam with decoupled weight decay: the decay shrinks `param.data` directly instead
+    of entering the gradient, so it never feeds the moment estimates."""
+
     def __init__(self, params: list[Tensor], lr: float=0.001, betas:tuple[float, float]=(0.9, 0.999), eps: float=1e-8, weight_decay: float=0.0):
         super().__init__(params, lr)
         self.lr:float = lr

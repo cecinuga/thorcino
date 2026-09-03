@@ -223,21 +223,13 @@ class ComputationalGraph:
 
     @staticmethod
     def _topo_order(root: Tensor) -> list[Tensor]:
-        """Iterative post-order DFS over the autograd graph rooted at ``root``,
-        yielding every tensor produced by an operation (i.e. with a
-        ``_grad_fn``) exactly once, each after every tensor it (transitively)
-        depends on - mirroring ``Tensor.__build_topo``.
+        """Post-order DFS over the autograd graph, yielding every op-produced tensor
+        once, after everything it depends on.
 
-        A tensor consumed by more than one downstream op (e.g. the
-        hidden/cell state shared by every gate in an RNN/LSTM timestep) is
-        marked "discovered" the moment it's first reached, so it is never
-        re-queued for expansion by a later consumer; without that guard the
-        whole upstream subgraph would be re-walked once per consumer,
-        compounding into an exponential blow-up across timesteps. The DFS
-        itself uses an explicit stack rather than function-call recursion,
-        so it also doesn't blow Python's recursion limit on the long chains
-        a many-timestep RNN/LSTM produces - the same failure mode the old
-        recursive ``backward()`` had before it moved to a topo-sorted pass."""
+        A tensor is marked discovered the first time it is reached, so a tensor with
+        several consumers (a shared RNN/LSTM state) never has its upstream subgraph
+        re-walked once per consumer. The stack is explicit rather than recursive, so
+        long timestep chains don't hit Python's recursion limit."""
         discovered: set[int] = {id(root)}
         order: list[Tensor] = []
         stack: list[tuple[Tensor, bool]] = [(root, False)]

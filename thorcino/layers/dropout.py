@@ -4,6 +4,9 @@ from thorcino.layers.layer import Layer
 from thorcino.tensor import Tensor
 
 class Dropout(Layer):
+    """Inverted dropout: zeroes each element with probability `p` and rescales the
+    survivors by `1/(1-p)` while training; the identity in `eval()` mode."""
+
     def __init__(self, p:float=0.5):
         self.p: float = p
         self.training: bool=True

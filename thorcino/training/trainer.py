@@ -30,6 +30,9 @@ def clip_grad_norm(parameters: list[Tensor], max_norm: float = 1.0) -> float:
     return float(total_norm)
 
 class Trainer:
+    """Drives the train/eval loop over a model, recording per-epoch metrics in `history`
+    and exposing pickle checkpoints through `save`/`load`."""
+
     def __init__(self,
         model: Layer,
         loss_fn: Loss,
@@ -50,6 +53,8 @@ class Trainer:
         self.history:dict[str, list[float]] = {'train_loss': [], 'eval_loss': [], 'accuracy': [], 'lr': []}
 
     def _accumulate(self, total_loss: float, accumulated_loss: float, num_batches: int):
+        """Clip, apply one optimizer step, clear the grads, and fold `accumulated_loss`
+        into the running totals."""
         if self.grad_clip_norm is not None:
             _ = clip_grad_norm(self.model.parameters, self.grad_clip_norm)
 
@@ -177,7 +182,7 @@ class Trainer:
         return self.history['eval_loss']
 
     def save(self, path: Path|str) -> None:
-        """Save metrics and model state onto the same file."""
+        """Pickle a full checkpoint: metrics plus model, optimizer and scheduler state."""
         checkpoint = {
             'epoch':            self.epoch,
             'step':             self.step,
@@ -190,7 +195,7 @@ class Trainer:
         self._save_artifact(path, checkpoint)
 
     def save_metrics(self, path: Path|str) -> None:
-        """Save metrics and model state onto the same file."""
+        """Pickle epoch, step and history only - no model or optimizer state."""
         checkpoint = {
             'epoch':            self.epoch,
             'step':             self.step,
@@ -204,7 +209,8 @@ class Trainer:
             pickle.dump(artifact, f)
 
     def load(self, path: Path|str) -> None:
-        """Restore epoch/step/history/training-mode from a checkpoint"""
+        """Restore a full checkpoint in place: counters, history, mode, and the model,
+        optimizer and scheduler state. Requires a `save()` file, not `save_metrics()`."""
         with open(path, 'rb') as f:
             checkpoint = pickle.load(f)
 

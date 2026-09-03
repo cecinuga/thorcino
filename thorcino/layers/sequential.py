@@ -11,6 +11,9 @@ if TYPE_CHECKING:
 
 
 class Sequential(Layer):
+    """Runs the given layers in order, forwarding parameters, state and mode switches
+    to each of them."""
+
     def __init__(self, *layers: Layer):
         self.training: bool = True
         self.layers: list[Layer] = list(layers)
@@ -37,6 +40,8 @@ class Sequential(Layer):
     @property
     @override
     def state(self) -> dict:
+        """Per-layer states keyed by `"l<index>:<layer repr>"`, so a reload only accepts
+        a model whose layers are in the same order with the same repr."""
         state = {}
         for i, layer in enumerate(self.layers):
             state[f"l{i}"] = layer.state
@@ -101,12 +106,16 @@ class Sequential(Layer):
 
 
     def save_arch(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        """Render the layer-by-layer architecture as a .png; `shape` is a real input
+        shape, batch dimension included."""
         self.__save_graph(path, shape)
 
     def save_forward(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        """Render the forward data-flow graph as a .png; see `save_arch` for `shape`."""
         self.__save_graph(path, shape, arch=False, forward=True)
 
     def save_backward(self, path: str | Path, shape: tuple[int, ...]) -> None:
+        """Render the autograd (backward) graph as a .png; see `save_arch` for `shape`."""
         self.__save_graph(path, shape, arch=False, backward=True)
 
     def destroy_graph(self) -> None:

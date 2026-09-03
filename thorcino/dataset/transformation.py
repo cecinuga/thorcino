@@ -1,6 +1,8 @@
 import numpy as np
 
 class RandomHorizontalFlip:
+    """Mirrors the last axis (width) with probability `p`."""
+
     def __init__(self, p:float=0.5):
         self.p = p
 
@@ -11,6 +13,8 @@ class RandomHorizontalFlip:
         return x
 
 class RandomCrop:
+    """Zero-pads by `padding` and crops back a random `height` x `width` window."""
+
     def __init__(self, height:int=0, width:int=0, padding:int=0):
         self.padding:int = padding
         self.h:int = height

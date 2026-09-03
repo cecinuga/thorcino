@@ -14,6 +14,8 @@ class MSELossBackward(Function):
         return Tensor(grad_output.data * local_grad),
 
 class CrossEntropyLossBackward(Function):
+    """Gradient w.r.t. raw logits; `targets` holds class indices, not one-hot rows."""
+
     @override
     def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
         logits, targets = self.saved_tensors
@@ -28,6 +30,8 @@ class CrossEntropyLossBackward(Function):
         return Tensor(grad_output.data * local_grad),
 
 class BCELossBackward(Function):
+    """Gradient w.r.t. probabilities (not logits), clipped as the forward pass is."""
+
     @override
     def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
         predictions, targets = self.saved_tensors

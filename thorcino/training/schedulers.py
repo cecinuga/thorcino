@@ -3,6 +3,8 @@ from abc import ABC, abstractmethod
 import numpy as np
 
 class Schedule(ABC):
+    """Learning-rate schedule: maps an epoch index to the learning rate to use."""
+
     @abstractmethod
     def get_lr(self, epoch: int) -> float:
         pass
@@ -17,6 +19,9 @@ class Schedule(ABC):
         pass
 
 class CosineSchedule(Schedule):
+    """Cosine annealing from `max_lr` down to `min_lr` over `total_epochs`, then flat
+    at `min_lr`."""
+
     def __init__(self, max_lr: float, min_lr: float, total_epochs: int):
         self.max_lr:float = max_lr
         self.min_lr:float = min_lr

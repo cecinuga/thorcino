@@ -21,6 +21,9 @@ class Dataset(ABC):
         pass
 
 class TensorDataset(Dataset):
+    """In-memory dataset over tensors sharing the same leading dimension; indexing
+    returns one slice per tensor."""
+
     def __init__(self, *tensors: Tensor):
         # Validate all tensor have same size in dim 0
         first_size = len(tensors[0].data)
@@ -38,6 +41,8 @@ class TensorDataset(Dataset):
 
 
 class ImageDataset(Dataset):
+    """Dataset of labelled image paths, decoding each file lazily on access."""
+
     def __init__(self, image_paths: list[str|Path], labels):
         self.image_paths: list[str|Path] = image_paths
         self.labels = labels
@@ -51,6 +56,9 @@ class ImageDataset(Dataset):
         return Tensor(image), Tensor(self.labels[idx])
 
 class DataLoader:
+    """Iterates a dataset in batches, stacking each sample field on a new leading axis.
+    The final batch is short when the dataset size isn't a multiple of `batch_size`."""
+
     def __init__(self, dataset: Dataset|list[Tensor], batch_size: int, shuffle: bool = False):
         if isinstance(dataset, list):
             self.dataset:Dataset = Dataset(dataset)
