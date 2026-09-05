@@ -67,9 +67,9 @@ class DivBackward(Function):
 
         inv = (1/b.data)
         if a.requires_grad:
-            grad_a = unbroadcast(grad_output.data * inv, b.shape)
+            grad_a = unbroadcast(grad_output.data * inv, a.shape)
         if b.requires_grad:
-            grad_b = unbroadcast(grad_output.data * -a.data*(inv**2), a.shape)
+            grad_b = unbroadcast(grad_output.data * -a.data*(inv**2), b.shape)
 
         return Tensor(grad_a), Tensor(grad_b)
 
@@ -151,3 +151,125 @@ class StackBackward(Function):
     def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
         chunks = np.split(grad_output.data, len(self.saved_tensors), axis=self.axis)
         return tuple(Tensor(np.squeeze(chunk, axis=self.axis)) for chunk in chunks)
+
+
+class NegBackward(Function):
+    """Gradient of `-a` (and of `other - a`): the incoming gradient, negated."""
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        a, = self.saved_tensors
+        out = np.array([])
+
+        if a.requires_grad:
+            out = unbroadcast(-grad_output.data, a.shape)
+
+        return Tensor(out),
+
+class ScaleBackward(Function):
+    """Gradient of `a * k` / `a / k` for a constant `k`: the incoming gradient, scaled."""
+
+    def __init__(self, a: Tensor, scale):
+        super().__init__(a)
+        self.scale = scale
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        a, = self.saved_tensors
+        out = np.array([])
+
+        if a.requires_grad:
+            out = unbroadcast(grad_output.data * self.scale, a.shape)
+
+        return Tensor(out),
+
+class PowBackward(Function):
+    """Gradient of `a ** k` for a constant exponent: `k * a**(k-1)`."""
+
+    def __init__(self, a: Tensor, exponent: float):
+        super().__init__(a)
+        self.exponent: float = exponent
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        a, = self.saved_tensors
+        out = np.array([])
+
+        if a.requires_grad:
+            out = grad_output.data * self.exponent * (a.data ** (self.exponent - 1))
+
+        return Tensor(out),
+
+class MeanBackward(Function):
+    """Spreads the incoming gradient evenly over the elements that were averaged."""
+
+    def __init__(self, x: Tensor, axis:int|None = None, keepdims:bool = False):
+        super().__init__(x)
+        self.axis:int|None = axis
+        self.keepdims:bool = keepdims
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        t, = self.saved_tensors
+
+        if not t.requires_grad:
+            return Tensor(np.array([])),
+
+        count = t.data.size if self.axis is None else t.data.shape[self.axis]
+        grad = _restore_reduced_axis(grad_output.data, t.data.ndim, self.axis, self.keepdims)
+
+        return Tensor(np.broadcast_to(grad, t.shape) / count),
+
+class MaxBackward(Function):
+    """Routes the incoming gradient to the extreme elements only, splitting it
+    evenly when several elements tie for the extremum."""
+
+    def __init__(self, x: Tensor, axis:int|None = None, keepdims:bool = False, largest: bool = True):
+        super().__init__(x)
+        self.axis:int|None = axis
+        self.keepdims:bool = keepdims
+        self.largest:bool = largest
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        t, = self.saved_tensors
+
+        if not t.requires_grad:
+            return Tensor(np.array([])),
+
+        reduce = np.max if self.largest else np.min
+        extremum = reduce(t.data, axis=self.axis, keepdims=True)
+        mask = (t.data == extremum).astype(t.data.dtype)
+        ties = np.sum(mask, axis=self.axis, keepdims=True)
+
+        grad = _restore_reduced_axis(grad_output.data, t.data.ndim, self.axis, self.keepdims)
+
+        return Tensor(mask * grad / ties),
+
+class IndexBackward(Function):
+    """Scatters the incoming gradient back into the positions that were selected,
+    accumulating where an index is selected more than once."""
+
+    def __init__(self, x: Tensor, idx):
+        super().__init__(x)
+        self.idx = idx
+
+    @override
+    def apply(self, grad_output: Tensor) -> tuple[Tensor, ...]:
+        a, = self.saved_tensors
+
+        if not a.requires_grad:
+            return Tensor(np.array([])),
+
+        out = np.zeros_like(a.data)
+        np.add.at(out, self.idx, grad_output.data)
+
+        return Tensor(out),
+
+def _restore_reduced_axis(grad: np.ndarray, ndim: int, axis:int|None, keepdims: bool) -> np.ndarray:
+    """Give `grad` back the axis a reduction removed, so it broadcasts against the operand."""
+    if keepdims:
+        return grad
+    if axis is None:
+        return np.reshape(grad, (1,) * ndim)
+    return np.expand_dims(grad, axis)

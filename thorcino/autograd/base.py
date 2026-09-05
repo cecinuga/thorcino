@@ -4,8 +4,13 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from thorcino.tensor import Tensor
 
+from thorcino.grad_mode import no_grad, is_grad_enabled
+
+__all__ = ["Function", "enable_autograd", "no_grad", "is_grad_enabled"]
+
 def enable_autograd(quiet:bool=False) -> None:
-    """No-op kept for API compatibility: autograd is always on."""
+    """No-op kept for API compatibility: autograd is on unless a `no_grad` block
+    is active - see `thorcino.grad_mode.no_grad`."""
     pass
 
 class Function:
