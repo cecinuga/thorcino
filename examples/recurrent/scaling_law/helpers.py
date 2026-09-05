@@ -1,6 +1,8 @@
 """Full Factorial Experiment"""
 import itertools
 import math
+from pathlib import Path
+import pickle
 import random
 import re
 import time
@@ -38,6 +40,56 @@ def log_scale(arr: list[float]) -> list[float]:
 
 ## E<experiment id>__<epoch>_<updates>_<n_sequence>_<sequence_length>__<age>s.pkl
 ARTIFACT_RE = re.compile(r"^E(\d+)__(\d+)_(\d+)_(\d+)_(\d+)__(\d+)s\.pkl$")
+
+@dataclass(frozen=True)
+class ArtifactInfo:
+    """The hyperparameters an artifact file name encodes.
+
+    The name is the only record of the setup a checkpoint was produced with, so
+    parsing it back is what lets an analysis pass group runs by factor without
+    re-opening every pickle.
+    """
+    experiment_id: int
+    epochs: int
+    updates: int
+    n_sequence: int
+    sequence_length: int
+    age: int
+
+@dataclass(frozen=True)
+class Artifact:
+    """The whole data of an artifact."""
+    metrics: dict[str, np.ndarray]
+    metadata: ArtifactInfo
+
+def parse_artifact(artifact: str) -> ArtifactInfo | None:
+    """Hyperparameters of one artifact name, or None if it is not one of ours.
+
+    Accepts either a bare file name or a path; anything that does not match the
+    E<id>__<epoch>_<updates>_<n_seq>_<seq_len>__<age>s.pkl shape is rejected rather
+    than half parsed, so a stray file in a checkpoint folder cannot be read as a run.
+    """
+    match = ARTIFACT_RE.match(path.basename(artifact))
+    if match is None:
+        return None
+
+    experiment_id, epochs, updates, n_seq, seq_len, age = (int(g) for g in match.groups())
+
+    return ArtifactInfo(experiment_id, epochs, updates, n_seq, seq_len, age)
+
+def load_artifact(artifact: str|Path) -> dict:
+    """Metrics of one artifact, keyed by experiment id and tagged with its hyperparameters."""
+    folder = path.exists(artifact)
+
+    info = parse_artifact(artifact)
+    if info is None:
+        return {}
+
+    with open(artifact, 'rb') as f:
+        metrics = pickle.load(f)
+
+    artifact = Artifact(metrics, info)
+    return artifact
 
 def index_artifacts(folder: str) -> dict[int, tuple[str, int]]:
     """Map experiment id -> (file name, epoch reached) for one artifact folder."""
