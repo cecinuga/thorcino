@@ -52,13 +52,15 @@ class SGD(Optimizer):
     @override
     @property
     def state(self):
-        return { 'lr': self.lr, 'weight_decay': self.weight_decay }
-    
+        return { 'lr': self.lr, 'weight_decay': self.weight_decay, 'step_count': self.step_count }
+
     @override
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.weight_decay = state['weight_decay']
-    
+        # Checkpoints written before step_count was recorded restart the counter.
+        self.step_count = state.get('step_count', 0)
+
 class SGD_DL2(Optimizer):
     """SGD with separate L2 decay rates for weight-tagged and bias-tagged parameters."""
 
@@ -87,12 +89,19 @@ class SGD_DL2(Optimizer):
     @override
     @property
     def state(self):
-        return { 'lr': self.lr, 'weight_decay': self.weight_decay }
+        return {
+            'lr': self.lr,
+            'weight_decay': self.weight_decay,
+            'bias_decay': self.bias_decay,
+            'step_count': self.step_count,
+        }
 
     @override
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.weight_decay = state['weight_decay']
+        self.bias_decay = state.get('bias_decay', 0.0)
+        self.step_count = state.get('step_count', 0)
 
 class SGDM(Optimizer):
     """SGD with classic (non-Nesterov) momentum; unlike `SGD`, `weight_decay` is added
@@ -131,13 +140,14 @@ class SGDM(Optimizer):
     @override
     @property
     def state(self):
-        return {'lr': self.lr, 'weight_decay': self.weight_decay, 'momentum': self.momentum, 'momentum_buffer': self.momentum_buffer}
+        return {'lr': self.lr, 'weight_decay': self.weight_decay, 'momentum': self.momentum, 'momentum_buffer': self.momentum_buffer, 'step_count': self.step_count}
 
     @override
     def set_state(self, state: dict) -> None:
         self.lr = state['lr']
         self.weight_decay = state['weight_decay']
         self.momentum = state['momentum']
+        self.step_count = state.get('step_count', 0)
 
         assert len(self.momentum_buffer) == len(state['momentum_buffer'])
         self.momentum_buffer = state['momentum_buffer'].copy()

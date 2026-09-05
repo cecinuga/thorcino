@@ -65,7 +65,8 @@ class DataLoader:
 
     def __init__(self, dataset: Dataset|list[Tensor], batch_size: int, shuffle: bool = False):
         if isinstance(dataset, list):
-            self.dataset:Dataset = Dataset(dataset)
+            # A bare list of per-field tensors is the TensorDataset case.
+            self.dataset:Dataset = TensorDataset(*dataset)
         else:
             self.dataset:Dataset = dataset
 

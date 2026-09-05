@@ -40,8 +40,9 @@ class Sequential(Layer):
     @property
     @override
     def state(self) -> dict:
-        """Per-layer states keyed by `"l<index>:<layer repr>"`, so a reload only accepts
-        a model whose layers are in the same order with the same repr."""
+        """Per-layer states keyed by `"l<index>"`, so a reload only accepts a model
+        with the same number of layers in the same order. Each layer validates its
+        own shapes in `set_state`."""
         state = {}
         for i, layer in enumerate(self.layers):
             state[f"l{i}"] = layer.state
