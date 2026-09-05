@@ -34,8 +34,23 @@ def split_dataset(X:np.ndarray, split_ratio:float = 0.9, axis:int=0) -> tuple[np
     return X0, X1
 
 def get_dataset(row: int, col: int) -> tuple[np.array, np.array]:
-    X_valid = np.array(tokenize(generate_valid_seqs(row, col)))
-    X_invalid = np.array(tokenize(generate_invalid_seqs(row, col*2)))
+    """`row` tokenized sequences of exactly `col` characters, half generated from the
+    grammar and half drawn uniformly from the alphabet.
+
+    Returns `X` of shape `(row, col, 3)` and `Y` of shape `(row, 1)`, where every
+    label is produced by parsing the sequence, so the random half is labelled
+    correctly on the rare occasions it happens to be grammatical.
+
+    A term is two characters wide, hence `col` must be even; the two halves must
+    split the requested rows evenly, hence `row` must be even too.
+    """
+    assert col % 2 == 0, f"sequence length must be even, terms are 2 characters wide: got {col}"
+    assert row % 2 == 0, f"number of sequences must be even to balance the classes: got {row}"
+
+    half = row // 2
+    # generate_valid_seq counts terms, not characters, so ask for col//2 of them.
+    X_valid = np.array(tokenize(generate_valid_seqs(half, col // 2)))
+    X_invalid = np.array(tokenize(generate_invalid_seqs(half, col)))
     X = np.append(X_valid, X_invalid, axis=0)
     np.random.shuffle(X)
 
