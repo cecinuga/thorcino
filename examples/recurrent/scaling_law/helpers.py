@@ -1,4 +1,5 @@
 """Full Factorial Experiment"""
+from genericpath import isdir
 import itertools
 import math
 from pathlib import Path
@@ -10,7 +11,7 @@ from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from os import listdir, path
 
-from thorcino.artifact import Artifact, load_artifact
+from thorcino.artifact.artifact import Artifact, load_artifact
 from thorcino.dataset.dataset import DataLoader, TensorDataset
 from thorcino.training.trainer import Trainer
 
@@ -60,6 +61,24 @@ class ArtifactInfo():
 class ExperimentArtifact():
     data: Artifact
     metadata: ArtifactInfo
+
+
+class FullFactorialMetrics:
+    metrics: list[ExperimentArtifact] = []
+
+    def __init__(self, path: str | Path) -> None:
+        self.load_dir(path)
+
+    def load_dir(self, path: str | Path) -> None:
+        if not isdir(path):
+            raise Exception("It's not a directory, rinvieniti.")
+        
+        artifacts = listdir(path)
+        for artifact in artifacts:
+            match = ARTIFACT_RE.match(artifact)
+            if match is not None:
+                self.metrics.append(load_experiment_artifact(f"{path}/{artifact}"))
+
 
 def parse_artifact(artifact: str) -> ArtifactInfo | None:
     """Hyperparameters of one artifact name, or None if it is not one of ours.
