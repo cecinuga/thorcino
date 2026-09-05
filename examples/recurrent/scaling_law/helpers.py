@@ -2,7 +2,6 @@
 import itertools
 import math
 from pathlib import Path
-import pickle
 import random
 import re
 import time
@@ -11,6 +10,7 @@ from collections.abc import Callable, Generator, Iterable
 from dataclasses import dataclass
 from os import listdir, path
 
+from thorcino.artifact import Artifact, load_artifact
 from thorcino.dataset.dataset import DataLoader, TensorDataset
 from thorcino.training.trainer import Trainer
 
@@ -42,7 +42,7 @@ def log_scale(arr: list[float]) -> list[float]:
 ARTIFACT_RE = re.compile(r"^E(\d+)__(\d+)_(\d+)_(\d+)_(\d+)__(\d+)s\.pkl$")
 
 @dataclass(frozen=True)
-class ArtifactInfo:
+class ArtifactInfo():
     """The hyperparameters an artifact file name encodes.
 
     The name is the only record of the setup a checkpoint was produced with, so
@@ -57,9 +57,8 @@ class ArtifactInfo:
     age: int
 
 @dataclass(frozen=True)
-class Artifact:
-    """The whole data of an artifact."""
-    metrics: dict[str, np.ndarray]
+class ExperimentArtifact():
+    data: Artifact
     metadata: ArtifactInfo
 
 def parse_artifact(artifact: str) -> ArtifactInfo | None:
@@ -77,19 +76,14 @@ def parse_artifact(artifact: str) -> ArtifactInfo | None:
 
     return ArtifactInfo(experiment_id, epochs, updates, n_seq, seq_len, age)
 
-def load_artifact(artifact: str|Path) -> dict:
-    """Metrics of one artifact, keyed by experiment id and tagged with its hyperparameters."""
-    folder = path.exists(artifact)
-
+def load_experiment_artifact(artifact: str|Path) -> ExperimentArtifact:
     info = parse_artifact(artifact)
-    if info is None:
-        return {}
+    data = load_artifact(artifact)
 
-    with open(artifact, 'rb') as f:
-        metrics = pickle.load(f)
-
-    artifact = Artifact(metrics, info)
-    return artifact
+    if info is None or data is None:
+        return None
+    
+    return ExperimentArtifact(data, info)
 
 def index_artifacts(folder: str) -> dict[int, tuple[str, int]]:
     """Map experiment id -> (file name, epoch reached) for one artifact folder."""
