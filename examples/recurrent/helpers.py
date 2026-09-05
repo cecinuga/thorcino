@@ -120,7 +120,7 @@ def plot_metrics(title:str, metrics: dict, epochs: int, eval_step: int):
 """Log Scale"""
 def log_scale(arr: list[float]) -> list[float]:
     c = arr[int(len(arr)/2)]
-    print(c)
+
     log_scale = list(map(
         lambda x: ((math.log2(x) - math.log2(c))), 
         arr
