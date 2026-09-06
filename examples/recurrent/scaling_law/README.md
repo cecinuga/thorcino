@@ -12,8 +12,9 @@ The example is made of two files:
 - [main.ipynb](./main.ipynb) — the notebook: hyperparameter configuration, model
   factory, validation set, the sweep itself and the analysis of the collected metrics.
 - [helpers.py](./helpers.py) — all the "business logic" behind the notebook: the
-  `Experiment` driver, the artifact naming/parsing, checkpoint recovery and the metric
-  loading utilities. The notebook is kept as thin as possible on purpose.
+  `Experiment` driver, the artifact naming/parsing, checkpoint recovery, the metric
+  loading utilities and the plotting layer (`metric_grid`, `plot_metric_surfaces`,
+  `plot_metric_scaling`). The notebook is kept as thin as possible on purpose.
 
 
 ## The Training Problem
@@ -64,9 +65,9 @@ The three factors under study:
 
 | Factor | Levels | Meaning |
 | --- | --- | --- |
-| `updates` | 512, 1024, 2048 | optimizer steps actually performed |
-| `number_of_sequence` | 128, 256, 512 | axis 0 of the input data, the dataset size |
-| `sequence_length` | 8, 16, 32 | axis 1 of the input data, in characters (must be even) |
+| `updates` | 2048, 5096, 10192 | requested optimizer steps, rounded up to a whole epoch |
+| `number_of_sequence` | 256, 512, 1024 | axis 0 of the input data, the dataset size |
+| `sequence_length` | 16, 32, 64 | axis 1 of the input data, in characters (must be even) |
 
 Note that the budget is expressed in **updates**, not epochs. One epoch performs
 
@@ -87,8 +88,9 @@ Everything else is held constant, so the factors are the only thing that varies:
 - Learning rate: `MAX_LR=1e-2`, `MIN_LR=1e-4`, cosine, **restarted at each checkpoint**
 - Token dimension = 3
 - Split ratio (train/test) = 0.9
-- Seed = 777 — each cell is reseeded, so the dataset is a controlled variable rather
-  than noise: re-running (or resuming) a cell rebuilds exactly the same data.
+- Seed = 777 — grid cell `i` is reseeded with `777 + i` (both `numpy`, which draws the
+  sequences, and `random`, which drives the `DataLoader` shuffle), so the dataset is a
+  controlled variable rather than noise: re-running a cell rebuilds exactly the same data.
 
 
 ## The Experiment
@@ -100,20 +102,30 @@ checkpoint is harvested at every smaller budget along the way, which gives the f
 
 That substitution is only sound if a harvested checkpoint is interchangeable with a run
 of that budget, and a single cosine spanning the whole run would break it: the
-512-update checkpoint would still sit near `MAX_LR` while the 2048-update one had
+2048-update checkpoint would still sit near `MAX_LR` while the 10192-update one had
 annealed to `MIN_LR`, so the updates factor would be **confounded with the learning
 rate**. `CosineRestartSchedule` therefore restarts the cosine at every checkpoint
 epoch, annealing `MAX_LR -> MIN_LR` inside each segment, so every harvested checkpoint
 is a fully annealed model of its own budget.
+
+The one thing the restart does not buy back is the training history: the 10192-update
+checkpoint is a run with two warm restarts behind it, not a fresh run of a single
+cosine over 10192 updates. The updates factor is therefore still (monotonically)
+confounded with the number of restarts, which is the price of paying for 27 design
+points with 9 runs.
 
 
 ### Validation Set
 
 The problem is length independent, so the models are scored against a **shared**
 validation set made of one sub-set per sequence length — `[8, 16, 32, 64, 96]`, 500
-sequences each — including lengths well beyond the ones seen in training, which is what
-makes length generalization visible. It is seeded once and kept fixed, so a re-run
-scores its models against exactly the same data.
+sequences each — spanning both below and well above the lengths seen in training
+(16, 32, 64), which is what makes length generalization visible. It is seeded once and
+kept fixed, so a re-run scores its models against exactly the same data.
+
+Each validation artifact therefore holds three parallel lists of five entries —
+`sequence_lengths`, `loss_history`, `accuracy_history` — one entry per validation
+length, **not** a per-epoch curve. Collapsing that axis is the analysis' first job.
 
 `Experiment.evaluate` runs this sweep with `record=False`: `Trainer.eval` would
 otherwise append to the same `history['eval_loss']` / `history['accuracy']` lists the
@@ -139,9 +151,13 @@ checkpoint was produced with:
 E<experiment id>__<epochs>_<updates>_<n_sequence>_<sequence_length>__<age>s.pkl
 ```
 
-e.g. `E17__128_2048_256_32__187s.pkl`. `parse_artifact` turns it back into an
-`ArtifactInfo`, which is what lets the analysis group runs by factor without reopening
+e.g. `E2__680_10200_256_16__139s.pkl`. `parse_artifact` turns it back into an
+`ExperimentInfo`, which is what lets the analysis group runs by factor without reopening
 every pickle.
+
+Note that `<epochs>` and `<updates>` are what the trainer *actually* did, not what was
+asked for: a budget is rounded up to a whole epoch, so the 10192-update level of a
+256-sequence cell (15 updates per epoch) is really 680 epochs and 10200 updates.
 
 Because the id is deterministic, an interrupted notebook can simply be re-run:
 `Experiment.scan_checkpoints` intersects the three folders and a checkpoint counts as
@@ -158,23 +174,56 @@ so the root must be on the path):
 
 ```bash
 uv sync --all-groups
-uv run jupyter lab examples/recurrent/scaling_law/main.ipynb
 ```
 
-Then run the cells top to bottom. The sweep is the expensive cell; with the checkpoints
-already in [checkpoint/](./checkpoint) it recovers all 27 design points and returns
-immediately, so the analysis cells can be run on their own. Deleting the folder makes
-the notebook retrain the whole grid from scratch (a few tens of minutes — the per-run
-wall clock is recorded in the `<age>s` field of each artifact name).
+The dev group ships `ipykernel` (the kernel) but not JupyterLab, so open
+[main.ipynb](./main.ipynb) in an editor pointed at the `.venv` kernel — or add the
+browser UI yourself with `uv add --dev jupyterlab`.
+
+Then run the cells top to bottom. The sweep is the expensive cell; whatever is already
+in [checkpoint/](./checkpoint) is recovered and skipped, so it only trains the design
+points that are missing. Deleting the folder makes the notebook retrain the whole grid
+from scratch. Cost is driven by the sequence length, since the update budget is fixed
+per cell: the cheapest cell (256 sequences, length 16) takes about 140 s on CPU, so the
+full 9-run grid is of the order of an hour. The per-run wall clock is recorded in the
+`<age>s` field of each artifact name.
 
 
 ## Analysis
 
 The metrics are reloaded with `FullFactorialMetrics(folder)`, which walks a checkpoint
-folder and pairs every `Artifact` with the `ArtifactInfo` parsed from its name, and the
-factor levels are put on a common footing with `log_scale`, which converts a level list
-to $\log_2$ distance from its middle level (so `[512, 1024, 2048]` becomes
-`[-1, 0, 1]`) — the natural axis for a scaling law, since every factor here doubles.
+folder and pairs every `Artifact` with the `ExperimentInfo` parsed from its name. The
+notebook then groups them by sequence length, and the plotting layer takes over.
 
-> **Status:** the sweep and the artifact collection are complete (27 design points on
-> disk); the plotting of the collected metrics is still work in progress.
+Three factors and one response are a 4-dimensional object, while a surface can only show
+two factors against one response. The sequence length is therefore spent on the
+**panels** — one plot per level — so each panel is a genuine 2-factor slice rather than
+a projection that hides a factor:
+
+| Function | What it draws |
+| --- | --- |
+| `metric_grid` | the `(number_of_sequence, updates)` grid of one metric, for one panel |
+| `plot_metric_surfaces` | one 3D surface per sequence length, shared colour and z scale |
+| `plot_metric_scaling` | the same data as flat log-log curves, one line per dataset size |
+
+`metric_grid` is where the validation-length axis is collapsed: `eval_index` picks a
+single validation length, `None` (the default) averages over all five. Cells with no
+artifact stay `NaN` rather than `0`, so a hole in the sweep reads as missing instead of
+as a perfect score.
+
+Both factor axes are put on a common footing with `log_scale`, which converts a level
+list to $\log_2$ distance from its middle level (`[256, 512, 1024]` becomes
+`[-1, 0, 1]`) — the natural axis for a scaling law, since the levels grow geometrically
+and on a linear axis the largest one would dominate the plot. The surfaces show the
+*shape* of the response; the log-log curves show its *rate*, since a slope there is the
+exponent the study is after. On a 3x3 grid a surface is only four quads drawn between
+nine real measurements, which is why the measurements themselves are marked with black
+dots.
+
+> **Status:** work in progress. Only the first grid cell is on disk (3 of the 27 design
+> points: 256 sequences x length 16), so the remaining 8 runs still have to be trained.
+> The plotting cells also do not run yet against these artifacts: `metric_grid` looks up
+> `metadata.updates` in `hyperparams['updates']`, but the name records the *actual* step
+> count (10200) while the factor level is the *requested* budget (10192), so the lookup
+> raises. Either the requested budget has to be recorded in the artifact name, or the
+> grid has to be indexed by checkpoint position instead of by value.

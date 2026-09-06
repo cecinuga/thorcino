@@ -1,4 +1,5 @@
 """Full Factorial Experiment"""
+import matplotlib.pyplot as plt
 from genericpath import isdir
 import itertools
 import math
@@ -43,7 +44,7 @@ def log_scale(arr: list[float]) -> list[float]:
 ARTIFACT_RE = re.compile(r"^E(\d+)__(\d+)_(\d+)_(\d+)_(\d+)__(\d+)s\.pkl$")
 
 @dataclass(frozen=True)
-class ArtifactInfo():
+class ExperimentInfo():
     """The hyperparameters an artifact file name encodes.
 
     The name is the only record of the setup a checkpoint was produced with, so
@@ -60,13 +61,12 @@ class ArtifactInfo():
 @dataclass(frozen=True)
 class ExperimentArtifact():
     data: Artifact
-    metadata: ArtifactInfo
+    metadata: ExperimentInfo
 
 
 class FullFactorialMetrics:
-    metrics: list[ExperimentArtifact] = []
-
     def __init__(self, path: str | Path) -> None:
+        self.metrics: list[ExperimentArtifact] = []
         self.load_dir(path)
 
     def load_dir(self, path: str | Path) -> None:
@@ -79,8 +79,7 @@ class FullFactorialMetrics:
             if match is not None:
                 self.metrics.append(load_experiment_artifact(f"{path}/{artifact}"))
 
-
-def parse_artifact(artifact: str) -> ArtifactInfo | None:
+def parse_artifact(artifact: str) -> ExperimentInfo | None:
     """Hyperparameters of one artifact name, or None if it is not one of ours.
 
     Accepts either a bare file name or a path; anything that does not match the
@@ -93,7 +92,7 @@ def parse_artifact(artifact: str) -> ArtifactInfo | None:
 
     experiment_id, epochs, updates, n_seq, seq_len, age = (int(g) for g in match.groups())
 
-    return ArtifactInfo(experiment_id, epochs, updates, n_seq, seq_len, age)
+    return ExperimentInfo(experiment_id, epochs, updates, n_seq, seq_len, age)
 
 def load_experiment_artifact(artifact: str|Path) -> ExperimentArtifact:
     info = parse_artifact(artifact)
@@ -366,3 +365,150 @@ class Experiment:
             print('-------------------EXPERIMENT ENDED------------------\n\n')
 
         return completed
+
+
+"""Plot the metrics of the full factorial.
+
+Three factors and one response make a 4-dimensional object, while a surface can only
+show two factors against one response. The sequence length is therefore spent on the
+panels - one surface per level - rather than on an axis, so every panel is a genuine
+2-factor slice instead of a projection that hides a factor.
+"""
+
+METRIC_LABELS = {
+    'loss_history': 'validation loss',
+    'accuracy_history': 'validation accuracy',
+}
+
+def metric_grid(
+    metrics: list[ExperimentArtifact],
+    hyperparams: dict,
+    key: str = 'loss_history',
+    eval_index: int | None = None,
+) -> np.ndarray:
+    """(number_of_sequence, updates) grid of one validation metric.
+
+    Every artifact stores one score per validation length, so that axis has to be
+    collapsed before a surface can be drawn: `eval_index` picks a single validation
+    length, `None` averages over all of them. Cells with no artifact stay NaN rather
+    than 0, so a hole in the sweep reads as missing instead of as a perfect score.
+    """
+    n_rows = len(hyperparams['number_of_sequence'])
+    n_cols = len(hyperparams['updates'])
+    Z = np.full((n_rows, n_cols), np.nan)
+
+    for metric in metrics:
+        i = hyperparams['number_of_sequence'].index(metric.metadata.n_sequence)
+        j = hyperparams['updates'].index(metric.metadata.updates)
+
+        values = np.asarray(metric.data.data[key], dtype=float)
+        Z[i, j] = values[eval_index] if eval_index is not None else values.mean()
+
+    return Z
+
+def plot_metric_surfaces(
+    grouped_metrics: list[dict],
+    hyperparams: dict,
+    key: str = 'loss_history',
+    eval_index: int | None = None,
+    figsize: tuple[int, int] = (16, 5),
+):
+    """One surface per sequence length: updates x number of sequences -> metric.
+
+    Both factor axes are log2 spaced and relative to the middle level, because the
+    levels grow geometrically: on a linear axis the largest level would dominate the
+    plot and the power law would read as a hockey stick. All panels share one colour
+    scale and one z range, so their heights can actually be compared.
+    """
+    log_updates = np.array(log_scale(hyperparams['updates']))
+    log_n_seq = np.array(log_scale(hyperparams['number_of_sequence']))
+    X, Y = np.meshgrid(log_updates, log_n_seq)
+
+    grids = [
+        metric_grid(group['metrics'], hyperparams, key, eval_index)
+        for group in grouped_metrics
+    ]
+
+    finite = np.concatenate([g[np.isfinite(g)].ravel() for g in grids])
+    vmin, vmax = float(finite.min()), float(finite.max())
+
+    fig, axes = plt.subplots(
+        1, len(grouped_metrics), figsize=figsize, subplot_kw={'projection': '3d'}
+    )
+    axes = np.atleast_1d(axes)
+
+    surf = None
+    for ax, group, Z in zip(axes, grouped_metrics, grids):
+        surf = ax.plot_surface(
+            X, Y, Z, cmap='viridis', vmin=vmin, vmax=vmax,
+            linewidth=0.3, edgecolor='k', antialiased=True, alpha=0.9,
+        )
+        ## The grid is 3x3, so the surface is four flat quads drawn between the real
+        ## measurements. Marking the measurements keeps the interpolation between them
+        ## from being read as data.
+        ax.scatter(X, Y, Z, color='k', s=12, depthshade=False)
+
+        ax.set_xticks(log_updates)
+        ax.set_xticklabels(hyperparams['updates'])
+        ax.set_yticks(log_n_seq)
+        ax.set_yticklabels(hyperparams['number_of_sequence'])
+        ax.set_zlim(vmin, vmax)
+
+        ax.set_xlabel('updates (log2)')
+        ax.set_ylabel('number of sequences (log2)')
+        ax.set_zlabel(METRIC_LABELS.get(key, key))
+        ax.set_title(f"sequence length = {group['sequence_length']}")
+
+    fig.colorbar(surf, ax=axes.tolist(), shrink=0.6, aspect=24,
+                 label=METRIC_LABELS.get(key, key))
+    fig.suptitle(
+        f"{METRIC_LABELS.get(key, key)} "
+        f"({'mean over validation lengths' if eval_index is None else f'validation length index {eval_index}'})"
+    )
+
+    return fig
+
+def plot_metric_scaling(
+    grouped_metrics: list[dict],
+    hyperparams: dict,
+    key: str = 'loss_history',
+    eval_index: int | None = None,
+    figsize: tuple[int, int] = (16, 4.5),
+):
+    """The same data as flat log-log curves: metric vs updates, one line per dataset size.
+
+    A slope on this plot is the exponent of the scaling law, which is the quantity the
+    study is after; on the surface that exponent is a tilt the eye has to guess at. The
+    surface shows the shape of the response, this shows its rate.
+    """
+    grids = [
+        metric_grid(group['metrics'], hyperparams, key, eval_index)
+        for group in grouped_metrics
+    ]
+
+    finite = np.concatenate([g[np.isfinite(g)].ravel() for g in grids])
+    pad = 0.05 * (finite.max() - finite.min() or 1.0)
+
+    fig, axes = plt.subplots(1, len(grouped_metrics), figsize=figsize, sharey=True)
+    axes = np.atleast_1d(axes)
+
+    for ax, group, Z in zip(axes, grouped_metrics, grids):
+        for i, n_seq in enumerate(hyperparams['number_of_sequence']):
+            ax.plot(hyperparams['updates'], Z[i], marker='o', label=f'n_seq={n_seq}')
+
+        ax.set_xscale('log', base=2)
+        if key == 'loss_history':
+            ax.set_yscale('log')
+
+        ax.set_xticks(hyperparams['updates'])
+        ax.set_xticklabels(hyperparams['updates'])
+        ax.set_ylim(finite.min() - pad, finite.max() + pad)
+        ax.set_xlabel('updates')
+        ax.set_title(f"sequence length = {group['sequence_length']}")
+        ax.grid(True, which='both', alpha=0.3)
+
+    axes[0].set_ylabel(METRIC_LABELS.get(key, key))
+    axes[-1].legend()
+    fig.suptitle(f'{METRIC_LABELS.get(key, key)} scaling')
+
+    return fig
