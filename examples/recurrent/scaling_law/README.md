@@ -185,8 +185,9 @@ in [checkpoint/](./checkpoint) is recovered and skipped, so it only trains the d
 points that are missing. Deleting the folder makes the notebook retrain the whole grid
 from scratch. Cost is driven by the sequence length, since the update budget is fixed
 per cell: the cheapest cell (256 sequences, length 16) takes about 140 s on CPU, so the
-full 9-run grid is of the order of an hour. The per-run wall clock is recorded in the
-`<age>s` field of each artifact name.
+full 9-run grid is about half an hour. The per-run wall clock is recorded in the
+`<age>s` field of each artifact name — the largest-budget artifacts of the nine cells
+add up to roughly 1800 s.
 
 
 ## Analysis
@@ -220,10 +221,59 @@ exponent the study is after. On a 3x3 grid a surface is only four quads drawn be
 nine real measurements, which is why the measurements themselves are marked with black
 dots.
 
-> **Status:** work in progress. Only the first grid cell is on disk (3 of the 27 design
-> points: 256 sequences x length 16), so the remaining 8 runs still have to be trained.
-> The plotting cells also do not run yet against these artifacts: `metric_grid` looks up
-> `metadata.updates` in `hyperparams['updates']`, but the name records the *actual* step
-> count (10200) while the factor level is the *requested* budget (10192), so the lookup
-> raises. Either the requested budget has to be recorded in the artifact name, or the
-> grid has to be indexed by checkpoint position instead of by value.
+## Results
+
+The full 3 x 3 x 3 grid is on disk, so all 27 design points below are measured rather
+than interpolated (the black dots on the surfaces are the measurements).
+
+### Surfaces — the shape of the response
+
+<p align="center">
+    <img src="./images/accuracy_surfaces.png"/>
+</p>
+
+<p align="center">
+    <img src="./images/loss_surfaces.png"/>
+</p>
+
+Accuracy tilts upward along the updates axis in all three panels: the budget is the
+factor that moves the response, and no panel has saturated at 10192 updates. The
+dataset-size axis is much flatter and, at length 16, not even monotonic. The loss
+surface is nearly flat by comparison — every cell but one sits in a narrow 0.45-0.63
+band, so on this grid the loss mostly fails to separate the design points that accuracy
+already separates.
+
+### Log-log curves — the rate
+
+<p align="center">
+    <img src="./images/accuracy_scaling.png"/>
+</p>
+
+<p align="center">
+    <img src="./images/loss_scaling.png"/>
+</p>
+
+Read as a scaling law, the flat panels are the interesting part:
+
+- **The budget is the binding constraint.** Almost every curve is still rising at the
+  largest budget, and at 2048 updates several cells sit at or below 0.6 accuracy — the
+  256-sequence cells start near chance (~0.48-0.59). At this scale the models are
+  undertrained, not data starved.
+- **One cell actually solves the task.** 1024 sequences x length 32 x 10192 updates
+  reaches ~0.99 accuracy and a loss of ~4.5e-2, an order of magnitude below every other
+  point in the study. That single point is what breaks the loss colour scale and makes
+  the other 26 look flat.
+- **More data is not uniformly better.** At length 16 the 512-sequence line is pinned at
+  chance (~0.50) through 5096 updates and only reaches ~0.59, while both 256 and 1024
+  pass 0.79. A monotone dataset-size effect would not do that, so on a 3-level factor
+  with one seed per cell this is run-to-run variance showing through the design, and it
+  is the main caveat on any exponent read off these slopes.
+- **Length costs accuracy, not learnability.** The length-64 panel reaches roughly the
+  same ~0.75-0.78 plateau as length 32 but climbs to it more slowly, which is the
+  expected cost of a longer credit-assignment path in a 3-unit LSTM.
+
+The honest summary is that this grid measures the *shape* of the response well enough to
+locate the binding factor (updates) and does not have the resolution to fit an exponent:
+three levels per factor, one seed per cell, and a single cell carrying most of the
+signal. Widening the grid — or repeating each cell across several seeds and reporting a
+band instead of a line — is what would turn these curves into an actual fitted law.
