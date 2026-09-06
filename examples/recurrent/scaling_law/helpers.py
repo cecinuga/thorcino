@@ -380,6 +380,30 @@ METRIC_LABELS = {
     'accuracy_history': 'validation accuracy',
 }
 
+def budget_index(info: ExperimentInfo, budgets: list[int]) -> int:
+    """Index of the update budget an artifact was harvested at.
+
+    The name records `trainer.step`, the steps actually taken, not the requested
+    budget: epochs are integral, so a run overshoots its budget by up to one epoch
+    and by a different amount at every dataset size (a 2048 budget lands on 2055,
+    2059 or 2088). Matching the recorded count against the budget list directly
+    therefore finds nothing.
+
+    `updates / epochs` recovers the updates per epoch exactly - the count is a whole
+    number of epochs by construction - and the budget is the only one that the run
+    could have overshot from, i.e. the one in (updates - per_epoch, updates].
+    """
+    per_epoch = info.updates // info.epochs
+
+    for j, budget in enumerate(budgets):
+        if info.updates - per_epoch < budget <= info.updates:
+            return j
+
+    raise ValueError(
+        f'experiment E{info.experiment_id} ran {info.updates} updates '
+        f'({info.epochs} epochs x {per_epoch}), which overshoots none of {budgets}'
+    )
+
 def metric_grid(
     metrics: list[ExperimentArtifact],
     hyperparams: dict,
@@ -399,7 +423,7 @@ def metric_grid(
 
     for metric in metrics:
         i = hyperparams['number_of_sequence'].index(metric.metadata.n_sequence)
-        j = hyperparams['updates'].index(metric.metadata.updates)
+        j = budget_index(metric.metadata, hyperparams['updates'])
 
         values = np.asarray(metric.data.data[key], dtype=float)
         Z[i, j] = values[eval_index] if eval_index is not None else values.mean()
