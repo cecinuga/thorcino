@@ -11,7 +11,9 @@ class MSELossBackward(Function):
         err = (predictions.data - targets.data)
         local_grad = (2*err)/predictions.data.size
 
-        return Tensor(grad_output.data * local_grad),
+        # Targets are data, never differentiated: an empty placeholder keeps the
+        # returned arity equal to len(saved_tensors), which backward() enforces.
+        return Tensor(grad_output.data * local_grad), Tensor(np.array([]))
 
 class CrossEntropyLossBackward(Function):
     """Gradient w.r.t. raw logits; `targets` holds class indices, not one-hot rows."""
@@ -27,7 +29,7 @@ class CrossEntropyLossBackward(Function):
         probs[np.arange(batch_size), target_indices] -= 1.0
         local_grad: np.ndarray = probs / batch_size
 
-        return Tensor(grad_output.data * local_grad),
+        return Tensor(grad_output.data * local_grad), Tensor(np.array([]))
 
 class BCELossBackward(Function):
     """Gradient w.r.t. probabilities (not logits), clipped as the forward pass is."""
@@ -43,4 +45,4 @@ class BCELossBackward(Function):
         # dL/dpred = (p - y) / (p * (1 - p)) / N, with the same clip as the forward
         local_grad: np.ndarray = (p - y) / (p * (1 - p)) / n
 
-        return Tensor(grad_output.data * local_grad),
+        return Tensor(grad_output.data * local_grad), Tensor(np.array([]))

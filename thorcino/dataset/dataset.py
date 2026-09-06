@@ -24,11 +24,15 @@ class TensorDataset(Dataset):
     """In-memory dataset over tensors sharing the same leading dimension; indexing
     returns one slice per tensor."""
 
-    def __init__(self, *tensors: Tensor):
+    def __init__(self, *tensors: Tensor|np.ndarray):
+        # Accept raw arrays too: wrapping here keeps `.data` a real ndarray.
+        # (`np.ndarray.data` is a memoryview, which can't be indexed per-sample.)
+        wrapped = tuple(t if isinstance(t, Tensor) else Tensor(t) for t in tensors)
+
         # Validate all tensor have same size in dim 0
-        first_size = len(tensors[0].data)
-        assert all(len(t.data) == first_size for t in tensors)
-        self.tensors:tuple[Tensor, ...] = tensors
+        first_size = len(wrapped[0].data)
+        assert all(len(t.data) == first_size for t in wrapped)
+        self.tensors:tuple[Tensor, ...] = wrapped
 
     @override
     def __len__(self) -> int:
@@ -61,7 +65,8 @@ class DataLoader:
 
     def __init__(self, dataset: Dataset|list[Tensor], batch_size: int, shuffle: bool = False):
         if isinstance(dataset, list):
-            self.dataset:Dataset = Dataset(dataset)
+            # A bare list of per-field tensors is the TensorDataset case.
+            self.dataset:Dataset = TensorDataset(*dataset)
         else:
             self.dataset:Dataset = dataset
 

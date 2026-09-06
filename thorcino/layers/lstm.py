@@ -56,7 +56,7 @@ class LSTM(Layer):
         self.weights_h_cell = Tensor(weights_data, role=WEIGHTS_ROLE)
 
         self.bias_input = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
-        self.bias_forget = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
+        self.bias_forget = Tensor(np.ones((1, hidden_units)), role=BIAS_ROLE)
         self.bias_output = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
         self.bias_cell = Tensor(np.zeros((1, hidden_units)), role=BIAS_ROLE)
 
@@ -92,6 +92,8 @@ class LSTM(Layer):
             (batch_size, sequence_length, in_feature), 
             (batch_size, sequence_length), 
             (sequence_length)
+            The two shapes without an explicit feature axis carry one scalar per
+            timestep, so they require `in_feature == 1`.
 
         Returns
         -------
@@ -99,19 +101,36 @@ class LSTM(Layer):
             (batch_size, sequence_length, hidden_units); with 'n_to_1', the last
             hidden state only (batch_size, hidden_units)
         """
+        # Normalise to (batch, time, feature) up front. Slicing a 2-D input per
+        # timestep would otherwise yield a 1-D (batch,) vector, which matmul happily
+        # contracts against the feature axis - reading the batch as features.
         if X.dim == 1:
-            X = X.reshape(1, -1)
+            X = X.reshape(1, X.shape[0], 1)
+        elif X.dim == 2:
+            X = X.reshape(X.shape[0], X.shape[1], 1)
+
+        if X.dim != 3:
+            raise ValueError(
+                f"LSTM expects at most 3 dimensions (batch, sequence_length, in_feature), got {X.shape}"
+            )
+        if X.shape[2] != self.in_feature:
+            raise ValueError(
+                f"LSTM input feature axis must match in_feature: {X.shape[2]} != {self.in_feature}\n"+
+                f"[x] got input shape {X.shape}\n"+
+                f"[x] inputs without an explicit feature axis are read as in_feature=1"
+            )
 
         batch_size, seq_len = X.shape[0], X.shape[1]
 
-        Ht = Tensor(np.zeros((batch_size, self.hidden_units)))
-        Mt = Tensor(np.zeros((batch_size, self.hidden_units)))
+        # The initial states are constants, not parameters: no gradient is needed.
+        Ht = Tensor(np.zeros((batch_size, self.hidden_units)), requires_grad=False)
+        Mt = Tensor(np.zeros((batch_size, self.hidden_units)), requires_grad=False)
 
         outs: list[Tensor] = []
         for t in range(seq_len):
             Hprev, Mprev = Ht, Mt
 
-            Xt = Tensor(X.data[:, t])
+            Xt = Tensor(X.data[:, t], requires_grad=False)
             
             It = self.__compute_gate_input(Xt, Hprev)
             Ft = self.__compute_gate_forget(Xt, Hprev)
@@ -184,7 +203,9 @@ class LSTM(Layer):
     @override
     def train(self) -> None:
         self.training = True
-        
+        self.tanh.train()
+        self.sigmoid.train()
+
         self.weights_input.requires_grad = True
         self.weights_forget.requires_grad = True
         self.weights_output.requires_grad = True
@@ -204,7 +225,9 @@ class LSTM(Layer):
     @override
     def eval(self) -> None:
         self.training = False
-        
+        self.tanh.eval()
+        self.sigmoid.eval()
+
         self.weights_input.requires_grad = False
         self.weights_forget.requires_grad = False
         self.weights_output.requires_grad = False
