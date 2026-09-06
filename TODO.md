@@ -1,6 +1,3 @@
-[trainer](thorcino/training/trainer.py)
-1) create a statich method in order to create a new Trainer instance directly from a checkpoint file.
-
 [loader](thorcino/loader.py)
 1) add parallel loading via multi threading
 2) add pre fetching of N+1 batches

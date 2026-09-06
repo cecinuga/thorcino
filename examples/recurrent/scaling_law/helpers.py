@@ -40,8 +40,33 @@ def log_scale(arr: list[float]) -> list[float]:
 
     return log_scale
 
-## E<experiment id>__<epoch>_<updates>_<n_sequence>_<sequence_length>__<age>s.pkl
-ARTIFACT_RE = re.compile(r"^E(\d+)__(\d+)_(\d+)_(\d+)_(\d+)__(\d+)s\.pkl$")
+## E<experiment id>__<epoch>_<updates>_<n_sequence>_<sequence_length>_S<seed>__<age>s.pkl
+##
+## The _S<seed> field is optional so that artifacts written before the study was
+## replicated still parse; they come back with seed=None and are reported as a single
+## unreplicated draw rather than silently counted as one seed of a band.
+ARTIFACT_RE = re.compile(r"^E(\d+)__(\d+)_(\d+)_(\d+)_(\d+)(?:_S(\d+))?__(\d+)s\.pkl$")
+
+
+def data_seed_for(base: int, n_sequence: int, sequence_length: int) -> int:
+    """Seed for the dataset draw of one cell.
+
+    Keyed on the cell's data shape and nothing else, so every replicate of a cell
+    trains on exactly the same sequences: the spread across replicates is then
+    initialisation noise alone, not initialisation noise plus a fresh data draw.
+    """
+    return base + 1_000_000 + 1000 * n_sequence + sequence_length
+
+
+def init_seed_for(base: int, replicate: int) -> int:
+    """Seed for the weight initialisation and the shuffle order of one replicate.
+
+    Keyed on the replicate index and nothing else, so replicate r starts from the
+    same weights in every cell of the grid. That makes the design paired: comparing
+    two cells compares them on a shared set of initialisations, and the part of the
+    seed noise common to both cancels instead of adding.
+    """
+    return base + replicate
 
 @dataclass(frozen=True)
 class ExperimentInfo():
@@ -56,6 +81,7 @@ class ExperimentInfo():
     updates: int
     n_sequence: int
     sequence_length: int
+    seed: int | None
     age: int
 
 @dataclass(frozen=True)
@@ -90,9 +116,13 @@ def parse_artifact(artifact: str) -> ExperimentInfo | None:
     if match is None:
         return None
 
-    experiment_id, epochs, updates, n_seq, seq_len, age = (int(g) for g in match.groups())
+    experiment_id, epochs, updates, n_seq, seq_len, seed, age = match.groups()
+    seed = None if seed is None else int(seed)
 
-    return ExperimentInfo(experiment_id, epochs, updates, n_seq, seq_len, age)
+    return ExperimentInfo(
+        int(experiment_id), int(epochs), int(updates),
+        int(n_seq), int(seq_len), seed, int(age),
+    )
 
 def load_experiment_artifact(artifact: str|Path) -> ExperimentArtifact:
     info = parse_artifact(artifact)
@@ -130,6 +160,10 @@ class Experiment:
     split_ratio: float
     seed: int
     checkpoint_folder: str = "./checkpoint"
+    ## Replicate indices, reused identically in every cell of the grid. One seed per
+    ## cell cannot estimate the error term of a factorial design: with no replication
+    ## there is nothing to compare a factor effect against, so noise reads as effect.
+    seeds: tuple[int, ...] = (0, 1, 2)
 
     @property
     def backup_folder(self) -> str:
@@ -213,7 +247,8 @@ class Experiment:
         checkpoint_epochs: list[int],
         n_sequence: int,
         sequence_length: int,
-        seed: int,
+        data_seed: int,
+        init_seed: int,
         resume_path: str | None = None,
         skip_epochs: Iterable[int] = (),
     ) -> Generator[tuple[Trainer, int], None, None]:
@@ -228,15 +263,26 @@ class Experiment:
 
         skip = set(skip_epochs)
 
-        ## Seed both generators: numpy draws the sequences, random drives the
-        ## DataLoader shuffle.
-        random.seed(seed)
-        np.random.seed(seed)
+        ## Three streams, seeded separately rather than drawn from one. Seeding once and
+        ## letting the draws run on ties the weight initialisation to the dataset:
+        ## get_dataset consumes a number of draws that depends on both n_sequence and
+        ## sequence_length, so make_trainer would start from a different stream position
+        ## in every cell and the initialisation would be confounded with both factors.
 
+        ## Dataset: keyed on the cell, so every replicate of this cell sees the same data.
+        np.random.seed(data_seed)
         X, Y = get_dataset(n_sequence, sequence_length)
         train_dl, test_dl = preprocess(X, Y, self.batch_size, self.split_ratio)
 
+        ## Weight initialisation: keyed on the replicate, so replicate r starts from the
+        ## same weights in every cell and the grid is compared on a shared set of inits.
+        np.random.seed(init_seed)
         trainer = make_trainer(checkpoint_epochs)
+
+        ## DataLoader shuffle order: also keyed on the replicate. The loaders were built
+        ## with shuffle=True and draw from `random` at iteration time, so seeding here
+        ## (after construction) is what fixes the batch order.
+        random.seed(init_seed)
 
         start_epoch = 0
         if resume_path is not None:
@@ -281,88 +327,118 @@ class Experiment:
         make_trainer: Callable[[list[int]], Trainer],
         val_dataset: list[tuple[np.ndarray, np.ndarray]],
     ) -> dict[int, tuple[str, int]]:
-        """Sweep number_of_sequence x sequence_length, harvesting the updates factor.
+        """Sweep number_of_sequence x sequence_length x replicate, harvesting the updates factor.
 
-        The updates factor is not swept: each cell is trained to the largest budget and
-        a checkpoint is harvested at every smaller budget along the way, which keeps the
-        cost at the largest budget rather than the sum of all of them. Three artifacts
-        are written per checkpoint - the full trainer state, the training metrics, and
-        the scores against the shared validation set - and cells already on disk are
-        skipped or resumed.
+        The updates factor is not swept: each run is trained to the largest budget and a
+        checkpoint is harvested at every smaller budget along the way, which keeps the
+        cost at the largest budget rather than the sum of all of them.
+
+        Every cell is run once per entry of `self.seeds`. The replicates share the cell's
+        dataset and differ only in initialisation and batch order, and the same replicate
+        indices are reused in every cell, so the whole grid is compared on one shared set
+        of initialisations. Without replication the design has no error term at all: a
+        factor effect smaller than the seed spread cannot be told apart from noise, and
+        on this task the seed spread is larger than every effect except the update budget.
+
+        Three artifacts are written per checkpoint - the full trainer state, the training
+        metrics, and the scores against the shared validation set - and runs already on
+        disk are skipped or resumed.
         """
         ## Indexing every factor with the same range requires them to be the same length.
         assert len(hyperparams['updates']) == len(hyperparams['number_of_sequence'])
         assert len(hyperparams['number_of_sequence']) == len(hyperparams['sequence_length'])
+        ## A repeated replicate index would train the same run twice and be read as two
+        ## independent samples, which narrows the reported band for free.
+        assert len(self.seeds) == len(set(self.seeds)), f'duplicate replicate seeds: {self.seeds}'
 
         n_checkpoints = len(hyperparams['updates'])
-        grid = list(itertools.product(range(len(hyperparams['number_of_sequence'])), repeat=2))
+        n_seeds = len(self.seeds)
+        cells = list(itertools.product(range(len(hyperparams['number_of_sequence'])), repeat=2))
 
         completed = self.scan_checkpoints()
         print(f'recovered {len(completed)} completed checkpoint(s): {sorted(completed)}')
+        print(f'planning {len(cells)} cells x {n_seeds} replicate(s) x {n_checkpoints} budgets '
+              f'= {len(cells) * n_seeds * n_checkpoints} design points\n')
 
-        for i, (idx_n_seq, idx_s_len) in enumerate(grid):
+        for i, (idx_n_seq, idx_s_len) in enumerate(cells):
             n_seq = hyperparams['number_of_sequence'][idx_n_seq]
             s_len = hyperparams['sequence_length'][idx_s_len]
 
             epochs, eval_step, checkpoint_epochs = self.plan(hyperparams, n_seq)
-            experiment_ids = [i * n_checkpoints + j for j in range(n_checkpoints)]
 
-            ## Resume from the longest run of checkpoints already on disk. Stopping at the
-            ## first gap keeps the resumed trainer's history contiguous: restarting from a
-            ## later checkpoint would leave the skipped one permanently missing.
-            done = 0
-            while done < n_checkpoints and experiment_ids[done] in completed:
-                done += 1
+            ## One dataset per cell, shared by all of its replicates: the spread across
+            ## replicates is then initialisation noise alone.
+            data_seed = data_seed_for(self.seed, n_seq, s_len)
 
-            print('-----------------NEW EXPERIMENT STARTED-----------------')
-            print(f'experiment hyperparameters: EPOCHS={epochs} UPDATES={hyperparams["updates"][-1]}, NUMBER_OF_SEQUENCE={n_seq}, SEQUENCE_LENGTH={s_len}')
-            print(f'updates per epoch: {updates_per_epoch(n_seq, self.split_ratio, self.batch_size)}, checkpoint epochs: {checkpoint_epochs}')
+            for r, replicate in enumerate(self.seeds):
+                init_seed = init_seed_for(self.seed, replicate)
 
-            if done == n_checkpoints:
-                print(f'all {n_checkpoints} checkpoints already saved, skipping')
+                ## Ids stay dense and stable as long as the factor levels and the seed
+                ## list do not change: cell-major, then replicate, then checkpoint.
+                ## Appending a seed to `seeds` therefore renumbers nothing already on disk.
+                experiment_ids = [(i * n_seeds + r) * n_checkpoints + j for j in range(n_checkpoints)]
+
+                ## Resume from the longest run of checkpoints already on disk. Stopping at the
+                ## first gap keeps the resumed trainer's history contiguous: restarting from a
+                ## later checkpoint would leave the skipped one permanently missing.
+                done = 0
+                while done < n_checkpoints and experiment_ids[done] in completed:
+                    done += 1
+
+                print('-----------------NEW EXPERIMENT STARTED-----------------')
+                print(f'experiment hyperparameters: EPOCHS={epochs} UPDATES={hyperparams["updates"][-1]}, NUMBER_OF_SEQUENCE={n_seq}, SEQUENCE_LENGTH={s_len}')
+                print(f'replicate {r + 1}/{n_seeds}: SEED={replicate} (data_seed={data_seed}, init_seed={init_seed})')
+                print(f'updates per epoch: {updates_per_epoch(n_seq, self.split_ratio, self.batch_size)}, checkpoint epochs: {checkpoint_epochs}')
+
+                if done == n_checkpoints:
+                    print(f'all {n_checkpoints} checkpoints already saved, skipping')
+                    print('-------------------EXPERIMENT ENDED------------------\n\n')
+                    continue
+
+                resume_path = None
+                if done > 0:
+                    resume_name, _ = completed[experiment_ids[done - 1]]
+                    resume_path = f'{self.backup_folder}/{resume_name}'
+                    print(f'{done} checkpoint(s) already saved, resuming')
+
+                j = done
+                start_experiment = time.perf_counter()
+                for trainer, act_epoch in self.run(
+                    make_trainer,
+                    epochs,
+                    eval_step,
+                    checkpoint_epochs,
+                    n_seq,
+                    s_len,
+                    data_seed=data_seed,
+                    init_seed=init_seed,
+                    resume_path=resume_path,
+                    skip_epochs=checkpoint_epochs[:done],
+                ):
+                    act_epoch += 1
+                    ## The trainer counts the optimizer steps it actually took, so this is the
+                    ## real update budget of the checkpoint rather than an estimate from n_seq.
+                    act_updates = trainer.step
+                    experiment_age = int(time.perf_counter() - start_experiment)
+
+                    artifact_name = (
+                        f"E{experiment_ids[j]}__{act_epoch}_{act_updates}_{n_seq}_{s_len}"
+                        f"_S{replicate}__{experiment_age}s.pkl"
+                    )
+
+                    trainer.save(f'{self.backup_folder}/{artifact_name}')
+                    trainer.save_metrics(f'{self.training_folder}/{artifact_name}')
+                    trainer._save_artifact(f'{self.validation_folder}/{artifact_name}', self.evaluate(trainer, val_dataset))
+
+                    ## Record it immediately so an interruption after this point still resumes here.
+                    completed[experiment_ids[j]] = (artifact_name, act_epoch)
+                    j += 1
+                    print(f'saved checkpoint: EPOCHS={act_epoch}, UPDATES={act_updates}, NUMBER_OF_SEQUENCE={n_seq}, SEQUENCE_LENGTH={s_len}, SEED={replicate}')
+
+                ## Measured once at the end: adding up the per-checkpoint elapsed times would
+                ## sum a sequence of running totals and roughly double the reported duration.
+                print(f'total experiment age: {int(time.perf_counter() - start_experiment)} seconds')
                 print('-------------------EXPERIMENT ENDED------------------\n\n')
-                continue
-
-            resume_path = None
-            if done > 0:
-                resume_name, _ = completed[experiment_ids[done - 1]]
-                resume_path = f'{self.backup_folder}/{resume_name}'
-                print(f'{done} checkpoint(s) already saved, resuming')
-
-            j = done
-            start_experiment = time.perf_counter()
-            for trainer, act_epoch in self.run(
-                make_trainer,
-                epochs,
-                eval_step,
-                checkpoint_epochs,
-                n_seq,
-                s_len,
-                seed=self.seed + i,
-                resume_path=resume_path,
-                skip_epochs=checkpoint_epochs[:done],
-            ):
-                act_epoch += 1
-                ## The trainer counts the optimizer steps it actually took, so this is the
-                ## real update budget of the checkpoint rather than an estimate from n_seq.
-                act_updates = trainer.step
-                experiment_age = int(time.perf_counter() - start_experiment)
-
-                artifact_name = f"E{experiment_ids[j]}__{act_epoch}_{act_updates}_{n_seq}_{s_len}__{experiment_age}s.pkl"
-
-                trainer.save(f'{self.backup_folder}/{artifact_name}')
-                trainer.save_metrics(f'{self.training_folder}/{artifact_name}')
-                trainer._save_artifact(f'{self.validation_folder}/{artifact_name}', self.evaluate(trainer, val_dataset))
-
-                ## Record it immediately so an interruption after this point still resumes here.
-                completed[experiment_ids[j]] = (artifact_name, act_epoch)
-                j += 1
-                print(f'saved checkpoint: EPOCHS={act_epoch}, UPDATES={act_updates}, NUMBER_OF_SEQUENCE={n_seq}, SEQUENCE_LENGTH={s_len}')
-
-            ## Measured once at the end: adding up the per-checkpoint elapsed times would
-            ## sum a sequence of running totals and roughly double the reported duration.
-            print(f'total experiment age: {int(time.perf_counter() - start_experiment)} seconds')
-            print('-------------------EXPERIMENT ENDED------------------\n\n')
 
         return completed
 
@@ -404,31 +480,115 @@ def budget_index(info: ExperimentInfo, budgets: list[int]) -> int:
         f'({info.epochs} epochs x {per_epoch}), which overshoots none of {budgets}'
     )
 
-def metric_grid(
+def collect_samples(
     metrics: list[ExperimentArtifact],
     hyperparams: dict,
     key: str = 'loss_history',
     eval_index: int | None = None,
-) -> np.ndarray:
-    """(number_of_sequence, updates) grid of one validation metric.
+) -> dict[tuple[int, int], list[float]]:
+    """(number_of_sequence index, updates index) -> one value per replicate.
 
-    Every artifact stores one score per validation length, so that axis has to be
-    collapsed before a surface can be drawn: `eval_index` picks a single validation
-    length, `None` averages over all of them. Cells with no artifact stay NaN rather
-    than 0, so a hole in the sweep reads as missing instead of as a perfect score.
+    Every artifact stores one score per validation length, so that axis is collapsed
+    first: `eval_index` picks a single validation length, `None` averages over all of
+    them. Replicates of the same cell land in the same list rather than overwriting
+    each other, which is what makes a band possible downstream.
     """
-    n_rows = len(hyperparams['number_of_sequence'])
-    n_cols = len(hyperparams['updates'])
-    Z = np.full((n_rows, n_cols), np.nan)
+    samples: dict[tuple[int, int], list[float]] = {}
 
     for metric in metrics:
         i = hyperparams['number_of_sequence'].index(metric.metadata.n_sequence)
         j = budget_index(metric.metadata, hyperparams['updates'])
 
         values = np.asarray(metric.data.data[key], dtype=float)
-        Z[i, j] = values[eval_index] if eval_index is not None else values.mean()
+        value = values[eval_index] if eval_index is not None else values.mean()
+        samples.setdefault((i, j), []).append(float(value))
+
+    return samples
+
+def metric_grid(
+    metrics: list[ExperimentArtifact],
+    hyperparams: dict,
+    key: str = 'loss_history',
+    eval_index: int | None = None,
+    reduce: str = 'median',
+) -> np.ndarray:
+    """(number_of_sequence, updates) grid of one validation metric, reduced over replicates.
+
+    The default is the median, not the mean: the response here is close to bimodal -
+    a run either stays at the chance plateau or solves the task - so a mean lands
+    between the two modes and describes no run that was actually observed.
+
+    `reduce='min'` is deliberately available but is not a measurement of the cell: the
+    best of k draws is a biased estimator whose bias grows with the cell's variance, so
+    picking it turns a noisy cell into an apparently better one. Use it to answer "what
+    is the best model I can get", never to compare factor levels.
+
+    Cells with no artifact stay NaN rather than 0, so a hole in the sweep reads as
+    missing instead of as a perfect score.
+    """
+    reducers = {'median': np.median, 'mean': np.mean, 'min': np.min, 'max': np.max}
+    assert reduce in reducers, f'unknown reduce {reduce!r}, expected one of {sorted(reducers)}'
+
+    n_rows = len(hyperparams['number_of_sequence'])
+    n_cols = len(hyperparams['updates'])
+    Z = np.full((n_rows, n_cols), np.nan)
+
+    for (i, j), values in collect_samples(metrics, hyperparams, key, eval_index).items():
+        Z[i, j] = reducers[reduce](values)
 
     return Z
+
+def metric_band(
+    metrics: list[ExperimentArtifact],
+    hyperparams: dict,
+    key: str = 'loss_history',
+    eval_index: int | None = None,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """(median, low, high, replicate count) grids for one validation metric.
+
+    The band is the full min-max over replicates rather than a quantile: with three
+    seeds a quantile is the same thing with a more confident name. It is the only part
+    of the plot that shows the noise floor, so a factor effect can be read as an effect
+    only where it clears the band.
+    """
+    n_rows = len(hyperparams['number_of_sequence'])
+    n_cols = len(hyperparams['updates'])
+    med, lo, hi = (np.full((n_rows, n_cols), np.nan) for _ in range(3))
+    counts = np.zeros((n_rows, n_cols), dtype=int)
+
+    for (i, j), values in collect_samples(metrics, hyperparams, key, eval_index).items():
+        med[i, j] = np.median(values)
+        lo[i, j] = np.min(values)
+        hi[i, j] = np.max(values)
+        counts[i, j] = len(values)
+
+    return med, lo, hi, counts
+
+def replication_report(metrics: list[ExperimentArtifact], hyperparams: dict) -> str:
+    """One line per design point saying how many replicates it actually has.
+
+    Every factor is broken out, sequence length included: collapsing it here would add
+    up the replicates of three different cells and report a design point as replicated
+    when each of its cells holds a single run.
+
+    A cell with one artifact still plots - as a line with a zero-width band, which reads
+    as a precise measurement rather than a missing one - so this is the check that says
+    which points carry an error term and which do not.
+    """
+    lines = []
+    for s_len in hyperparams['sequence_length']:
+        at_length = [m for m in metrics if m.metadata.sequence_length == s_len]
+        counts = metric_band(at_length, hyperparams)[3]
+
+        for i, n_seq in enumerate(hyperparams['number_of_sequence']):
+            for j, updates in enumerate(hyperparams['updates']):
+                n = counts[i, j]
+                flag = '' if n > 1 else '   <- unreplicated, band is not meaningful'
+                lines.append(
+                    f'  seq_len={s_len:<4} n_seq={n_seq:<5} updates={updates:<6} replicates={n}{flag}'
+                )
+
+    return '\n'.join(lines)
 
 def plot_metric_surfaces(
     grouped_metrics: list[dict],
@@ -486,7 +646,7 @@ def plot_metric_surfaces(
     fig.colorbar(surf, ax=axes.tolist(), shrink=0.6, aspect=24,
                  label=METRIC_LABELS.get(key, key))
     fig.suptitle(
-        f"{METRIC_LABELS.get(key, key)} "
+        f"{METRIC_LABELS.get(key, key)} - median over replicates "
         f"({'mean over validation lengths' if eval_index is None else f'validation length index {eval_index}'})"
     )
 
@@ -505,20 +665,32 @@ def plot_metric_scaling(
     study is after; on the surface that exponent is a tilt the eye has to guess at. The
     surface shows the shape of the response, this shows its rate.
     """
-    grids = [
-        metric_grid(group['metrics'], hyperparams, key, eval_index)
+    bands = [
+        metric_band(group['metrics'], hyperparams, key, eval_index)
         for group in grouped_metrics
     ]
 
-    finite = np.concatenate([g[np.isfinite(g)].ravel() for g in grids])
+    ## The band, not the median, sets the y range: a range fitted to the medians alone
+    ## would clip the very spread the band exists to show.
+    finite = np.concatenate([
+        np.concatenate([lo[np.isfinite(lo)].ravel(), hi[np.isfinite(hi)].ravel()])
+        for _, lo, hi, _ in bands
+    ])
     pad = 0.05 * (finite.max() - finite.min() or 1.0)
 
     fig, axes = plt.subplots(1, len(grouped_metrics), figsize=figsize, sharey=True)
     axes = np.atleast_1d(axes)
 
-    for ax, group, Z in zip(axes, grouped_metrics, grids):
+    for ax, group, (Z, lo, hi, counts) in zip(axes, grouped_metrics, bands):
         for i, n_seq in enumerate(hyperparams['number_of_sequence']):
-            ax.plot(hyperparams['updates'], Z[i], marker='o', label=f'n_seq={n_seq}')
+            line, = ax.plot(hyperparams['updates'], Z[i], marker='o', label=f'n_seq={n_seq}')
+
+            ## min-max over replicates. Where a cell has a single run the band collapses
+            ## onto the line, which is the honest picture: no error term was measured.
+            ax.fill_between(
+                hyperparams['updates'], lo[i], hi[i],
+                color=line.get_color(), alpha=0.18, linewidth=0,
+            )
 
         ax.set_xscale('log', base=2)
         if key == 'loss_history':
@@ -533,6 +705,11 @@ def plot_metric_scaling(
 
     axes[0].set_ylabel(METRIC_LABELS.get(key, key))
     axes[-1].legend()
-    fig.suptitle(f'{METRIC_LABELS.get(key, key)} scaling')
+
+    n_reps = sorted({int(c) for _, _, _, counts in bands for c in counts.ravel() if c})
+    fig.suptitle(
+        f'{METRIC_LABELS.get(key, key)} scaling - median line, min-max band over '
+        f'{"/".join(map(str, n_reps))} replicate(s)'
+    )
 
     return fig
